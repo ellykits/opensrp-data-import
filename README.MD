@@ -19,14 +19,14 @@ the following operations:
 
 ### Usage
 
-1. Download the latest version of the `*-fat.jar` from the release section of this repo.
-Run the commands independently. When importing data to a new database it is recommended to run the commands in the order
+1. Download or build the latest version of the `*-fat.jar`. When importing data to a new database it is recommended to run the commands in the order
 described in the documentation.
 
-2. Copy the content of the file `application_sample.properties` into your configs file. Remember to replace the placeholders
+2. Copy the content of the file `application_sample.properties` into your configs file. Replace the placeholders
 with the correct values.
 
-3. Execute the commands as desired.:
+3. Execute the commands independently as desired. Just note that for new databases, some commands are dependent for
+instance you cannot assign locations to nonexistent teams. You have to import the teams (organizations in OpenSRP) first.
 
 Command options
 
