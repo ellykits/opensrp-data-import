@@ -27,8 +27,8 @@ object DatabaseQueries {
 
   const val LOCATIONS_COUNT_QUERY = """
   SELECT count(*) count
-  FROM location_another_duplicate l
-           LEFT JOIN location_another_duplicate p on p.location_id = l.parent_location
+  FROM location l
+           LEFT JOIN location p on p.location_id = l.parent_location
            LEFT JOIN location_tag_map tm on l.location_id = tm.location_id
            LEFT JOIN location_tag t on t.location_tag_id = tm.location_tag_id;
   """
@@ -67,8 +67,8 @@ object DatabaseQueries {
                    t.name                                                           tag_name,
                    if(t.description is null, concat(t.name, ' Tag'), t.description) tag_description,
                    if(t.retired = 0, 'true', 'false')                               tag_active
-     FROM location_another_duplicate l
-                 LEFT JOIN location_another_duplicate p on p.location_id = l.parent_location
+     FROM location l
+                 LEFT JOIN location p on p.location_id = l.parent_location
                  LEFT JOIN location_tag_map tm on l.location_id = tm.location_id
                  LEFT JOIN location_tag t on t.location_tag_id = tm.location_tag_id
      LIMIT $offset,$limit) AS lt
