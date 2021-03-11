@@ -13,6 +13,10 @@ import kotlinx.coroutines.launch
 import org.smartregister.dataimport.shared.BaseVerticle
 import java.sql.SQLException
 
+/**
+ * A subclass of [BaseVerticle] that forms the base class for all the classes with functions that interact with OpenMRS
+ * database
+ */
 abstract class BaseOpenMRSVerticle : BaseVerticle() {
 
   private lateinit var pool: MySQLPool
@@ -36,6 +40,9 @@ abstract class BaseOpenMRSVerticle : BaseVerticle() {
     limit = config.getInteger("data.limit", 50)
   }
 
+  /**
+   * This method runs the count [query] and send message with the result to the [eventBusAddress] provided
+   */
   protected fun countRecords(eventBusAddress: String, query: String) {
     pool.withConnection { connection: SqlConnection ->
       connection
@@ -54,6 +61,9 @@ abstract class BaseOpenMRSVerticle : BaseVerticle() {
     }
   }
 
+  /**
+   * THis method runs the provided [query] then obtains the result from the [columnName] and reply's via the [message]
+   */
   protected fun replyWithOpenMRSData(message: Message<Int>, query: String, columnName: String) {
     pool.getConnection { connection ->
       if (connection.succeeded()) {

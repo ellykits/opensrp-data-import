@@ -13,6 +13,11 @@ import kotlinx.coroutines.sync.withLock
 import org.smartregister.dataimport.shared.BaseVerticle
 import org.smartregister.dataimport.shared.EventBusAddress
 
+/**
+ * Subclass of [BaseVerticle] that is responsible for obtaining access token from Keycloak that is then used by the
+ * Web client to make requests. This class also runs a periodic task to refresh the token based on the time the
+ * token is set to expire.
+ */
 class OpenSRPAuthVerticle : BaseVerticle() {
 
   private lateinit var oAuth2Auth: OAuth2Auth

@@ -21,6 +21,14 @@ import kotlinx.coroutines.launch
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+/**
+ * This is the base class extending [CoroutineVerticle] for all the Verticles. It provides the [webClient] used to perform
+ * web requests. Also has [circuitBreaker] for wrapping web requests. [CircuitBreaker] is an implementation of
+ * circuit breaker pattern.
+ *
+ * The [limit] and [requestInterval] are config defaults used to limit the number of records that can be sent per each
+ * request and the time period between each server request respectively.
+ */
 abstract class BaseVerticle : CoroutineVerticle() {
 
   private lateinit var webClient: WebClient

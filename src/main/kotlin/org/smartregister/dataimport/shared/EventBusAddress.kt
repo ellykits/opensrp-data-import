@@ -1,5 +1,8 @@
 package org.smartregister.dataimport.shared
 
+/**
+ * Event bus addresses. Verticles can subscribe and publish to the following addresses
+ */
 object EventBusAddress {
   const val OPENMRS_USERS_LOAD = "openmrs.users.load"
   const val OPENMRS_USERS_COUNT = "openmrs.users.count"

@@ -4,6 +4,9 @@ import org.smartregister.dataimport.shared.DatabaseQueries
 import org.smartregister.dataimport.shared.EventBusAddress
 import org.smartregister.dataimport.shared.PRACTITIONER_ROLES
 
+/**
+ * Subclass of [BaseOpenMRSVerticle] used to retrieve user team assignments from OpenMRS
+ */
 class OpenMRSUserRoleVerticle : BaseOpenMRSVerticle() {
   override suspend fun start() {
 

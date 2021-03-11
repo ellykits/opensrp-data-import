@@ -4,6 +4,9 @@ import io.vertx.core.json.JsonArray
 import org.smartregister.dataimport.openmrs.OpenMRSTeamLocationVerticle
 import org.smartregister.dataimport.shared.EventBusAddress
 
+/**
+ * Subclass of [BaseOpenSRPVerticle] responsible for assigning OpenSRP organizations to locations
+ */
 class OpenSRPOrganizationLocationVerticle : BaseOpenSRPVerticle() {
 
   override suspend fun start() {

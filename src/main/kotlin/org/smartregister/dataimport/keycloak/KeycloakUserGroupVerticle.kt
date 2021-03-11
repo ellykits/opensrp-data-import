@@ -6,6 +6,10 @@ import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
 import org.smartregister.dataimport.shared.*
 
+/**
+ * A subclass of [BaseVerticle] that queries the keycloak groups for a group name called 'Provider' then assigns
+ * every user in keycloak it.
+ */
 class KeycloakUserGroupVerticle : BaseVerticle() {
 
   override suspend fun start() {

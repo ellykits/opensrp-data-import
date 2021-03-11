@@ -9,6 +9,9 @@ import org.smartregister.dataimport.shared.EventBusAddress
 import org.smartregister.dataimport.shared.ID
 import org.smartregister.dataimport.shared.LOCATION_TAGS
 
+/**
+ * Subclass of [BaseOpenSRPVerticle] responsible for posting OpenSRP locations
+ */
 class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   override suspend fun start() {

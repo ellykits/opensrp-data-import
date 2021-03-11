@@ -8,8 +8,17 @@ import kotlinx.coroutines.launch
 import org.smartregister.dataimport.shared.BaseVerticle
 import org.smartregister.dataimport.shared.EventBusAddress
 
+/**
+ * Subclass of [BaseVerticle] which is the base class for all classes with OpenSRP related code
+ */
 abstract class BaseOpenSRPVerticle : BaseVerticle() {
 
+  /**
+   * This function consumes the messaged in the event bus from the [countAddress]. Once A count has been received,
+   * the function request for data from OpenMRS periodically (as configured via the [requestInterval] property)
+   * via event bus through [loadAddress]. This will prompt querying OpenMRS
+   * database for data once the data is received the callback method [block] with the data as its parameter
+   */
   protected fun consumeData(countAddress: String, loadAddress: String, block: suspend (JsonArray) -> Unit) {
     vertx.eventBus().consumer<Int>(countAddress).handler {
       try {

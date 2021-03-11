@@ -5,6 +5,9 @@ import org.smartregister.dataimport.shared.DatabaseQueries.getLocationsImportQue
 import org.smartregister.dataimport.shared.EventBusAddress
 import org.smartregister.dataimport.shared.LOCATIONS
 
+/**
+ * Subclass of [BaseOpenMRSVerticle] that is used to retrieve all the openmrs locations.
+ */
 class OpenMRSLocationVerticle : BaseOpenMRSVerticle() {
 
   override suspend fun start() {

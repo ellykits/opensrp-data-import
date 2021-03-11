@@ -5,6 +5,9 @@ import org.smartregister.dataimport.shared.DatabaseQueries.getTeamLocationsImpor
 import org.smartregister.dataimport.shared.EventBusAddress
 import org.smartregister.dataimport.shared.TEAM_LOCATIONS
 
+/**
+ * Subclass of [BaseOpenMRSVerticle] that returns the locations assigned to the various teams available in OpenMRS
+ */
 class OpenMRSTeamLocationVerticle : BaseOpenMRSVerticle() {
 
   override suspend fun start() {

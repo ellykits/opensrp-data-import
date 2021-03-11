@@ -1,8 +1,9 @@
-package org.smartregister.dataimport.main
+package org.smartregister.dataimport
 
 import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.core.deploymentOptionsOf
+import org.smartregister.dataimport.main.MainVerticle
 import org.smartregister.dataimport.shared.IMPORT_OPTION
 
 /**

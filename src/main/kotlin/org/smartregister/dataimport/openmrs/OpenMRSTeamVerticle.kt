@@ -5,6 +5,9 @@ import org.smartregister.dataimport.shared.DatabaseQueries.getTeamsImportQuery
 import org.smartregister.dataimport.shared.EventBusAddress
 import org.smartregister.dataimport.shared.TEAMS
 
+/**
+ * Subclass of [BaseOpenMRSVerticle] that returns all the available teams in OpenMRS
+ */
 class OpenMRSTeamVerticle : BaseOpenMRSVerticle() {
 
   override suspend fun start() {

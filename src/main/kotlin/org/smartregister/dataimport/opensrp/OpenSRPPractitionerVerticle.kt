@@ -10,6 +10,9 @@ import org.smartregister.dataimport.openmrs.OpenMRSUserVerticle
 import org.smartregister.dataimport.shared.*
 import java.util.*
 
+/**
+ * Subclass of [BaseOpenSRPVerticle] responsible for posting OpenSRP practitioners
+ */
 class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
 
   private val userIdsMap = TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)

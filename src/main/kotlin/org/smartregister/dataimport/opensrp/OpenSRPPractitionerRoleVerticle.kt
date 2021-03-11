@@ -5,6 +5,9 @@ import io.vertx.kotlin.coroutines.await
 import org.smartregister.dataimport.openmrs.OpenMRSUserRoleVerticle
 import org.smartregister.dataimport.shared.EventBusAddress
 
+/**
+ * Subclass of [BaseOpenSRPVerticle] responsible for assigning OpenSRP practitioners to organizations
+ */
 class OpenSRPPractitionerRoleVerticle : BaseOpenSRPVerticle() {
 
   override suspend fun start() {

@@ -9,6 +9,10 @@ import org.smartregister.dataimport.shared.ACTIVE
 import org.smartregister.dataimport.shared.DESCRIPTION
 import org.smartregister.dataimport.shared.NAME
 
+/**
+ * Subclass of [BaseOpenSRPVerticle] responsible for posting OpenSRP location tags and for deploying [OpenSRPLocationVerticle]
+ * verticle once all the tags are created.
+ */
 class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
   override suspend fun start() {
     super.start()

@@ -10,6 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.smartregister.dataimport.shared.*
 
+/**
+ * A subclass of [BaseVerticle] that queries all OpenMRS users and creates corresponding user accounts in Keycloak
+ */
 class KeycloakUserVerticle : BaseVerticle() {
 
   override suspend fun start() {
