@@ -10,6 +10,7 @@ import org.smartregister.dataimport.shared.EventBusAddress
 class OpenSRPOrganizationLocationVerticle : BaseOpenSRPVerticle() {
 
   override suspend fun start() {
+    super.start()
     vertx.deployVerticle(OpenMRSTeamLocationVerticle())
     consumeData(
       countAddress = EventBusAddress.OPENMRS_TEAM_LOCATIONS_COUNT,

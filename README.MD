@@ -38,7 +38,7 @@ Command options
 List available options (name of configs file `app.properties`)
 
 ```shell script
-java -jar opensrp-data-import-1.0.3-SNAPSHOT-fat.jar --configs-file app.properties  --help
+java -jar opensrp-data-import-1.0.4-SNAPSHOT-fat.jar --configs-file app.properties  --help
 ```
 
 ### Configurations
@@ -56,6 +56,7 @@ java -jar opensrp-data-import-1.0.3-SNAPSHOT-fat.jar --configs-file app.properti
 | keycloak.realm | Keycloak Realm |
 | keycloak.user.username | Username for Keycloak User|
 | keycloak.user.password | Password for Keycloak User|
+| keycloak.user.request.interval | Interval for making request to keycloak users |
 | keycloak.rest.users.url | Get all Keycloak Users endpoint. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/users*  |
 | keycloak.rest.users.count.url | Endpoint for counting Keycloak Users. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/users/count* |
 | keycloak.rest.groups.url | Endpoint for fetching Keycloak groups. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/groups*  |

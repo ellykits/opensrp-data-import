@@ -11,5 +11,5 @@ import org.smartregister.dataimport.shared.IMPORT_OPTION
  */
 fun main() {
   Vertx.vertx()
-    .deployVerticle(MainVerticle(), deploymentOptionsOf(config = JsonObject().put(IMPORT_OPTION, "locations")))
+    .deployVerticle(MainVerticle(), deploymentOptionsOf(config = JsonObject().put(IMPORT_OPTION, "organization_locations")))
 }

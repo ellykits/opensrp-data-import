@@ -4,10 +4,12 @@ import io.vertx.core.eventbus.Message
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
+import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.smartregister.dataimport.openmrs.OpenMRSUserVerticle
 import org.smartregister.dataimport.shared.*
 
 /**
@@ -17,6 +19,7 @@ class KeycloakUserVerticle : BaseVerticle() {
 
   override suspend fun start() {
     super.start()
+    vertx.deployVerticle(OpenMRSUserVerticle()).await()
 
     vertx.eventBus().consumer<Int>(EventBusAddress.OPENMRS_USERS_COUNT).handler { countMessage ->
       try {
