@@ -72,7 +72,7 @@ abstract class BaseOpenMRSVerticle : BaseVerticle() {
           try {
             val rowSet = sqlConnection.query(query).execute().await()
             if (rowSet.size() > 0) {
-              val records = JsonArray(rowSet.map { JsonObject(it.getJson(columnName) as String) })
+              val records = JsonArray(rowSet.map { JsonObject(it.getJson(columnName).toString()) })
               logger.info("Send ${records.size()} $columnName records from OpenMRS")
               message.reply(records)
             } else {
