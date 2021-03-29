@@ -46,15 +46,15 @@ class KeycloakUserVerticle : BaseVerticle() {
     }
   }
 
-  private fun createUser(users: JsonArray) {
+  private suspend fun createUser(users: JsonArray) {
     if (!users.isEmpty) {
-      launch(Dispatchers.IO) {
         //Filter out openmrs & daemon users as they are no longer needed
         try {
           users.map { it as JsonObject }
             .onEach { payload ->
               webRequest(
-                method = HttpMethod.GET, url = config.getString("keycloak.rest.users.url"),
+                method = HttpMethod.POST,
+                url = config.getString("keycloak.rest.users.url"),
                 payload = payload.apply {
                   remove(IDENTIFIER)
                   remove(NAME)
@@ -64,7 +64,6 @@ class KeycloakUserVerticle : BaseVerticle() {
           logger.error("$concreteClassName::Error creating Keycloak User")
           vertx.exceptionHandler().handle(throwable)
         }
-      }
     }
   }
 }
