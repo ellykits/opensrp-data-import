@@ -20,28 +20,34 @@ import org.smartregister.dataimport.shared.EventBusAddress
  */
 class OpenSRPAuthVerticle : BaseVerticle() {
 
-  private lateinit var oAuth2Auth: OAuth2Auth
+  private var oAuth2Auth: OAuth2Auth? = null
 
   override suspend fun start() {
     super.start()
-    oAuth2Auth = KeycloakAuth.discover(vertx, OAuth2Options().apply {
-      clientID = config.getString("keycloak.client.id")
-      clientSecret = config.getString("keycloak.client.secret")
-      site = config.getString("keycloak.site")
-      tenant = config.getString("keycloak.realm")
-      flow = OAuth2FlowType.PASSWORD
-    }).await()
+    try {
+      oAuth2Auth = KeycloakAuth.discover(vertx, OAuth2Options().apply {
+        clientID = config.getString("keycloak.client.id")
+        clientSecret = config.getString("keycloak.client.secret")
+        site = config.getString("keycloak.site")
+        tenant = config.getString("keycloak.realm")
+        flow = OAuth2FlowType.PASSWORD
+      }).await()
+      if (oAuth2Auth != null) {
+        getAccessToken()
+      }
+    } catch (throwable: Throwable) {
+      logger.error("Keycloak configuration error", throwable)
+    }
 
-    getAccessToken()
   }
 
   private fun getAccessToken() {
-    if (user == null) {
+    if (user == null && oAuth2Auth != null) {
       val credentials = JsonObject().apply {
         put("username", config.getString("keycloak.user.username"))
         put("password", config.getString("keycloak.user.password"))
       }
-      oAuth2Auth.authenticate(credentials).onSuccess {
+      oAuth2Auth!!.authenticate(credentials).onSuccess {
         logger.info("Authentication Successful")
         user = it
         vertx.eventBus().send(EventBusAddress.OAUTH_TOKEN_RECEIVED, true)
@@ -58,13 +64,13 @@ class OpenSRPAuthVerticle : BaseVerticle() {
 
   private fun refreshTokenPeriodically(expiryPeriod: Long) {
     val mutex = Mutex()
-    if (user != null) {
+    if (user != null && oAuth2Auth != null) {
       vertx.setPeriodic(expiryPeriod * 1000) {
         try {
           launch(Dispatchers.IO) {
             mutex.withLock {
               if (user!!.expired()) {
-                user = oAuth2Auth.refresh(user).await()
+                user = oAuth2Auth!!.refresh(user).await()
               }
               logger.info("Access token refreshed")
             }
