@@ -38,7 +38,7 @@ Command options
 List available options (name of configs file `app.properties`)
 
 ```shell script
-java -jar opensrp-data-import-1.0.0-SNAPSHOT-fat.jar --configs-file app.properties  --help
+java -jar opensrp-data-import-1.0.1-SNAPSHOT-fat.jar --configs-file app.properties  --help
 ```
 
 ### Configurations
@@ -80,9 +80,9 @@ To launch your tests:
 ./gradlew clean test
 ```
 
-To package your application:
+To package your application (Will build a fat/uber jar):
 ```
-./gradlew clean assemble
+./gradlew clean assembleShadowDist
 ```
 
 To watch for files changes (Requires you to run the application in a separate terminal):
