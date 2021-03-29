@@ -31,6 +31,7 @@ class OpenSRPAuthVerticle : BaseVerticle() {
         site = config.getString("keycloak.site")
         tenant = config.getString("keycloak.realm")
         flow = OAuth2FlowType.PASSWORD
+        isValidateIssuer = false
       }).await()
       if (oAuth2Auth != null) {
         getAccessToken()

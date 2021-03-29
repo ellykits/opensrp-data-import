@@ -38,7 +38,7 @@ Command options
 List available options (name of configs file `app.properties`)
 
 ```shell script
-java -jar opensrp-data-import-1.0.1-SNAPSHOT-fat.jar --configs-file app.properties  --help
+java -jar opensrp-data-import-1.0.2-SNAPSHOT-fat.jar --configs-file app.properties  --help
 ```
 
 ### Configurations
