@@ -16,7 +16,7 @@ the following operations:
 - Access to OpenMRS database (Enable remote database access, when using the tool from an external server. You can disable
  remote database access afterwards)
 - Internet connection - This is required by the web client to communicate with OpenSRP
-
+- MySQL version 5.7+
 ### Usage
 
 1. Download or build the latest version of the `*-fat.jar`. When importing data to a new database it is recommended to run the commands in the order
