@@ -43,7 +43,7 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
     }
   }
 
-  private fun endOperation(dataLoadAddress: String) {
+  fun endOperation(dataLoadAddress: String) {
     val data = when (dataLoadAddress) {
       EventBusAddress.OPENMRS_USERS_LOAD -> "users"
       EventBusAddress.OPENMRS_TEAM_LOCATIONS_LOAD -> "team locations mapping"

@@ -7,10 +7,12 @@ import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.smartregister.dataimport.openmrs.OpenMRSUserVerticle
-import org.smartregister.dataimport.shared.*
+import org.smartregister.dataimport.shared.BaseVerticle
+import org.smartregister.dataimport.shared.EventBusAddress
+import org.smartregister.dataimport.shared.IDENTIFIER
+import org.smartregister.dataimport.shared.NAME
 
 /**
  * A subclass of [BaseVerticle] that queries all OpenMRS users and creates corresponding user accounts in Keycloak

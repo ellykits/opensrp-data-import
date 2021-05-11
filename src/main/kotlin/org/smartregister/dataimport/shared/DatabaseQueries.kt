@@ -35,8 +35,9 @@ object DatabaseQueries {
 
   fun getLocationsImportQuery(offset: Int, locationHierarchy: List<String>, limit: Int): String {
     val tagExpression = StringBuilder("CASE\n")
-    for ((index, tag) in locationHierarchy.withIndex()) {
-      tagExpression.append("WHEN t.name = '${tag.trim()}' THEN $index\n")
+    locationHierarchy.forEach { tag ->
+      val tagSplit = tag.split(":")
+      tagExpression.append("WHEN t.name = '${tagSplit.first().trim()}' THEN ${tagSplit.last().trim()}\n")
     }
     tagExpression.append("END")
     val query = """

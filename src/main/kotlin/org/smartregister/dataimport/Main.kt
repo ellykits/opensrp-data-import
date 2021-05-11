@@ -1,14 +1,14 @@
 package org.smartregister.dataimport
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
 import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.core.deploymentOptionsOf
 import org.smartregister.dataimport.main.MainVerticle
-import org.smartregister.dataimport.shared.Choices
-import org.smartregister.dataimport.shared.IMPORT_OPTION
+import org.smartregister.dataimport.shared.*
 
 fun main(args: Array<String>) {
   Application().main(args)
@@ -20,8 +20,17 @@ class Application : CliktCommand(name = "opensrp-data-import") {
 
   private val configsFile: String? by option(
     help = "Configs file", envvar = "OPENSRP_DATA_IMPORT_CONFIGS_FILE",
-    names = arrayOf("--configs-file")
+    names = arrayOf("--configs-file", "-c")
   )
+
+  private val sourceFile: String? by option(
+    help = "Source file (MUST be in CSV format)", envvar = "OPENSRP_DATA_IMPORT_SOURCE_FILE",
+    names = arrayOf("--source-file", "-s")
+  )
+
+  private val skipLocationTags: Boolean by option("--skip-location-tags", "-sLT" ).flag(default = false)
+
+  private val createTeams: Boolean by option("--create-teams", "-cT" ).flag(default = false)
 
   private val importOption: String? by option(
     help = """
@@ -57,9 +66,17 @@ class Application : CliktCommand(name = "opensrp-data-import") {
 
     if (configsFile != null && importOption != null) {
       mainVerticle.setConfigsFile(configsFile!!)
-      vertx.deployVerticle(mainVerticle, deploymentOptionsOf(config = JsonObject().put(IMPORT_OPTION, importOption)))
+
+      val configs = JsonObject().apply {
+        put(IMPORT_OPTION, importOption)
+        put(SOURCE_FILE, sourceFile)
+        put(SKIP_LOCATION_TAGS, skipLocationTags)
+        put(CREATE_TEAMS, createTeams)
+      }
+
+      vertx.deployVerticle(mainVerticle, deploymentOptionsOf(config = configs))
     } else {
-      echo("--configs-file and --import options are required. Use --help for more information")
+      echo("--configs-file and --import options are required --source-file optional. Use --help for more information")
     }
   }
 }

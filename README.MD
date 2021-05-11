@@ -38,7 +38,7 @@ Command options
 List available options (name of configs file `app.properties`)
 
 ```shell script
-java -jar opensrp-data-import-1.0.5-SNAPSHOT-fat.jar --configs-file app.properties  --help
+java -jar opensrp-data-import-1.0.6-SNAPSHOT-fat.jar --configs-file app.properties  --help
 ```
 
 ### Configurations
@@ -66,7 +66,7 @@ java -jar opensrp-data-import-1.0.5-SNAPSHOT-fat.jar --configs-file app.properti
 | opensrp.rest.organization.location.url | OpenSRP endpoint for mapping organizations to locations |
 | opensrp.rest.practitioner.url | OpenSRP endpoint for posting practitioners |
 | opensrp.rest.practitioner.role.url | OpenSRP endpoint for mapping practitioners to organizations|
-| location.hierarchy | Comma separated ordered string of location level. *e.g* *Contry,Region,County* |
+| location.hierarchy | Comma separated string of location levels with their corresponding geographical level. Top level starts from 0. *e.g* *Country:0,Region:1,County:2, Sub-county:3, District:4, Health Facility: 5 * |
 | data.limit | Number of records to send per request. Default `50`|
 | request.interval | Set time interval in milliseconds between each request. Default `10000` |
 | request.timeout | Sets the timeout in milliseconds. If an action is not completed before this timeout, the action is considered as a failure default `10000`|

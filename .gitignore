@@ -187,3 +187,4 @@ build
 !.vscode/extensions.json
 
 conf/application.properties
+assets/

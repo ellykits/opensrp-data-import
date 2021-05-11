@@ -3,14 +3,14 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent.*
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-  kotlin("jvm") version "1.4.21"
-  kotlin("plugin.serialization") version "1.4.21"
+  kotlin("jvm") version "1.5.0"
+  kotlin("plugin.serialization") version "1.5.0"
   application
   id("com.github.johnrengelman.shadow") version "6.1.0"
 }
 
 group = "org.smartregister"
-version = "1.0.5-SNAPSHOT"
+version = "1.0.6-SNAPSHOT"
 
 repositories {
   mavenCentral()
@@ -29,9 +29,10 @@ application {
 
 val vertxVersion = "4.0.2"
 val junitJupiterVersion = "5.7.0"
-val kotlinSerializationVersion = "1.0.1"
+val kotlinSerializationVersion = "1.2.0"
 val logbackVersion = "1.2.3"
 val cliktVersion = "3.1.0"
+val openCsvVersion = "5.4"
 
 dependencies {
   implementation(platform("io.vertx:vertx-stack-depchain:$vertxVersion"))
@@ -47,6 +48,7 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinSerializationVersion")
   implementation("ch.qos.logback:logback-classic:$logbackVersion")
   implementation("com.github.ajalt.clikt:clikt:$cliktVersion")
+  implementation("com.opencsv:opencsv:$openCsvVersion")
 
   implementation(kotlin("stdlib-jdk8"))
   testImplementation("io.vertx:vertx-junit5")

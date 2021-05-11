@@ -1,7 +1,6 @@
 package org.smartregister.dataimport.opensrp
 
 import io.vertx.core.json.JsonArray
-import io.vertx.kotlin.coroutines.await
 import org.smartregister.dataimport.openmrs.OpenMRSUserRoleVerticle
 import org.smartregister.dataimport.shared.EventBusAddress
 

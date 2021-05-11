@@ -14,6 +14,7 @@ import io.vertx.ext.web.client.HttpRequest
 import io.vertx.ext.web.client.HttpResponse
 import io.vertx.ext.web.client.WebClient
 import io.vertx.ext.web.multipart.MultipartForm
+import io.vertx.kotlin.core.deploymentOptionsOf
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.kotlin.coroutines.await
 import kotlinx.coroutines.Dispatchers
@@ -57,9 +58,11 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
     vertx.exceptionHandler { throwable ->
       logger.error("$concreteClassName::Vertx exception", throwable)
+      vertx.close()
     }
 
     logger.info("$concreteClassName deployed with id: $deploymentID")
+
     try {
       val filePath = configsFile ?: "conf/application.properties"
       val options = ConfigRetrieverOptions().addStore(
@@ -84,8 +87,8 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
-  protected suspend fun deployVerticle(verticle: BaseVerticle) {
-    val deploymentID = vertx.deployVerticle(verticle).await()
+  protected suspend fun deployVerticle(verticle: BaseVerticle, configs:JsonObject = JsonObject()) {
+    val deploymentID = vertx.deployVerticle(verticle, deploymentOptionsOf(config = configs)).await()
     deployedVerticlesMap[verticle::class.java.simpleName] = deploymentID
   }
 

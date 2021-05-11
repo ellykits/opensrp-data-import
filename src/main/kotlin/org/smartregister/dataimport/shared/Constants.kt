@@ -23,6 +23,11 @@ const val ACTIVE = "active"
 const val CIRCUIT_BREAKER_NAME = "opensrp.circuit.breaker"
 const val DESCRIPTION = "description"
 const val IMPORT_OPTION = "import_option"
+const val SOURCE_FILE = "source_file"
+const val SKIP_LOCATION_TAGS = "skipLocationTags"
+const val CREATE_TEAMS = "createTeams"
+const val COUNTER = "counter"
+
 
 enum class Choices {
   LOCATIONS, ORGANIZATIONS, PRACTITIONERS, KEYCLOAK_USERS, ORGANIZATION_LOCATIONS, PRACTITIONER_ROLES
