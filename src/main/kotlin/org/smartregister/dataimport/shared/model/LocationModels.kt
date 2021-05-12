@@ -12,7 +12,9 @@ data class Location(
   @Transient
   var isNew: Boolean = false,
   @Transient
-  var hasTeam: Boolean = false
+  var hasTeam: Boolean = false,
+  @Transient
+  var uniqueName: String? = null
 )
 
 @Serializable

@@ -29,8 +29,12 @@ class Application : CliktCommand(name = "opensrp-data-import") {
   )
 
   private val generateTeams: String? by option(
-    help = "Indicate the Location Level to Assign teams",
-    names = arrayOf("--generate-teams-at", "-gTA")
+    help = "Indicate the Location Level to Assign teams", names = arrayOf("--generate-teams-at", "-gTA")
+  )
+
+  private val usersFile: String? by option(
+    help = "File containing users details. This is used to export to ",
+    names = arrayOf("--users-file", "-uF")
   )
 
   private val skipLocationTags: Boolean by option("--skip-location-tags", "-sLT").flag(default = false)
@@ -54,15 +58,15 @@ class Application : CliktCommand(name = "opensrp-data-import") {
     """.trimIndent(),
     names = arrayOf("--import")
   ).choice(
-    getChoice(Choices.LOCATIONS),
-    getChoice(Choices.ORGANIZATIONS),
-    getChoice(Choices.ORGANIZATION_LOCATIONS),
-    getChoice(Choices.KEYCLOAK_USERS),
-    getChoice(Choices.PRACTITIONERS),
-    getChoice(Choices.PRACTITIONER_ROLES)
+    getChoice(DataItem.LOCATIONS),
+    getChoice(DataItem.ORGANIZATIONS),
+    getChoice(DataItem.ORGANIZATION_LOCATIONS),
+    getChoice(DataItem.KEYCLOAK_USERS),
+    getChoice(DataItem.PRACTITIONERS),
+    getChoice(DataItem.PRACTITIONER_ROLES)
   )
 
-  private fun getChoice(choices: Choices) = choices.name.lowercase()
+  private fun getChoice(dataItem: DataItem) = dataItem.name.lowercase()
 
   override fun run() {
     val mainVerticle = MainVerticle()
@@ -73,6 +77,7 @@ class Application : CliktCommand(name = "opensrp-data-import") {
       val configs = JsonObject().apply {
         put(IMPORT_OPTION, importOption)
         put(SOURCE_FILE, sourceFile)
+        put(USERS_FILE, usersFile)
         put(SKIP_LOCATION_TAGS, skipLocationTags)
         put(GENERATE_TEAMS, generateTeams)
       }

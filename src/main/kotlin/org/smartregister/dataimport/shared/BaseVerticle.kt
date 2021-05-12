@@ -59,6 +59,8 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected val concreteClassName: String = this::class.java.simpleName
 
+  protected fun jsonEncoder() = Json { encodeDefaults = true }
+
   override suspend fun start() {
     vertx.exceptionHandler { throwable ->
       logger.error("$concreteClassName::Vertx exception", throwable)
@@ -179,6 +181,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
   protected fun getVerticleCommonConfigs() =
     JsonObject().apply {
       put(SOURCE_FILE, config.getString(SOURCE_FILE, ""))
+      put(USERS_FILE, config.getString(USERS_FILE, ""))
       put(SKIP_LOCATION_TAGS, config.getBoolean(SKIP_LOCATION_TAGS, false))
     }
 
@@ -204,8 +207,10 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
-  protected inline fun <reified T> readCsvData(fileName: String): List<T> {
-    val reader = FileReader("$dataDirectoryPath$fileName.csv")
+  protected inline fun <reified T> readCsvData(fileName: String, fromAnyPlace: Boolean = false, skipLines: Int = 0): List<T> {
+    val fullPath = if (fromAnyPlace) fileName else "$dataDirectoryPath$fileName.csv"
+
+    val reader = FileReader(fullPath)
     val mappingStrategy = ColumnPositionMappingStrategy<T>().apply { type = T::class.java }
     val csvData = mutableListOf<T>()
 
@@ -213,6 +218,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       val csvToBean = CsvToBeanBuilder<T>(reader)
         .withType(T::class.java)
         .withIgnoreLeadingWhiteSpace(true)
+        .withSkipLines(skipLines)
         .withMappingStrategy(mappingStrategy)
         .build()
 

@@ -12,10 +12,10 @@ class OpenSRPPractitionerRoleVerticle : BaseOpenSRPVerticle() {
   override suspend fun start() {
     super.start()
     vertx.deployVerticle(OpenMRSUserRoleVerticle())
-    consumeData(
+    consumeOpenMRSData(
       countAddress = EventBusAddress.OPENMRS_USER_ROLE_COUNT,
       loadAddress = EventBusAddress.OPENMRS_USER_ROLE_LOAD,
-      block = this::postUserRoles
+      action = this::postUserRoles
     )
   }
 

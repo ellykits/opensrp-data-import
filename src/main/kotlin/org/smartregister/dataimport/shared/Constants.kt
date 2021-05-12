@@ -24,14 +24,14 @@ const val CIRCUIT_BREAKER_NAME = "opensrp.circuit.breaker"
 const val DESCRIPTION = "description"
 const val IMPORT_OPTION = "import_option"
 const val SOURCE_FILE = "source_file"
+const val USERS_FILE = "users_file"
 const val SKIP_LOCATION_TAGS = "skipLocationTags"
 const val GENERATE_TEAMS = "generateTeams"
-const val COUNTER = "counter"
 const val FILE_NAME = "fileName"
 const val PAYLOAD = "payload"
 const val HOME_DIR_PROPERTY = "user.home"
 const val OPENSRP_DATA_PATH = "opensrp-data"
 
-enum class Choices {
+enum class DataItem {
   LOCATIONS, ORGANIZATIONS, PRACTITIONERS, KEYCLOAK_USERS, ORGANIZATION_LOCATIONS, PRACTITIONER_ROLES
 }

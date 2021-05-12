@@ -43,10 +43,10 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
       }
     }
 
-    consumeData(
+    consumeOpenMRSData(
       countAddress = EventBusAddress.OPENMRS_USERS_COUNT,
       loadAddress = EventBusAddress.OPENMRS_USERS_LOAD,
-      block = this::createPractitioners
+      action = this::createPractitioners
     )
   }
 

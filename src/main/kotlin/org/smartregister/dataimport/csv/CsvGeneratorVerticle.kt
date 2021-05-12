@@ -28,9 +28,9 @@ class CsvGeneratorVerticle : BaseVerticle() {
           val payload = message.body().getString(PAYLOAD)
 
           createNonExistentFile(fileName)
-          when (Choices.valueOf(fileName.uppercase())) {
-            Choices.ORGANIZATIONS -> writeCsv<Organization>(fileName, payload)
-            Choices.ORGANIZATION_LOCATIONS -> writeCsv<OrganizationLocation>(fileName, payload)
+          when (DataItem.valueOf(fileName.uppercase())) {
+            DataItem.ORGANIZATIONS -> writeCsv<Organization>(fileName, payload)
+            DataItem.ORGANIZATION_LOCATIONS -> writeCsv<OrganizationLocation>(fileName, payload)
             else -> logger.info("CSV File not supported")
           }
         }

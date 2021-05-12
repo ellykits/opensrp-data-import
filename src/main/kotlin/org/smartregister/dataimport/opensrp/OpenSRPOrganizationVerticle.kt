@@ -12,10 +12,10 @@ class OpenSRPOrganizationVerticle : BaseOpenSRPVerticle() {
   override suspend fun start() {
     super.start()
     vertx.deployVerticle(OpenMRSTeamVerticle())
-    consumeData(
+    consumeOpenMRSData(
       countAddress = EventBusAddress.OPENMRS_TEAMS_COUNT,
       loadAddress = EventBusAddress.OPENMRS_TEAMS_LOAD,
-      block = this::postTeams
+      action = this::postTeams
     )
   }
 

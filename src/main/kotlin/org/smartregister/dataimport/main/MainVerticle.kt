@@ -29,16 +29,16 @@ class MainVerticle : BaseVerticle() {
           val verticleConfigs = getVerticleCommonConfigs()
           val csvGeneratorVerticleId = vertx.deployVerticle(CsvGeneratorVerticle()).await()
           if (choice != null && csvGeneratorVerticleId != null) {
-            when (Choices.valueOf(choice.uppercase())) {
-              Choices.LOCATIONS -> deployVerticle(
+            when (DataItem.valueOf(choice.uppercase())) {
+              DataItem.LOCATIONS -> deployVerticle(
                 OpenSRPLocationTagVerticle(), verticleConfigs
                   .put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, ""))
               )
-              Choices.ORGANIZATIONS -> deployVerticle(OpenSRPOrganizationVerticle(), verticleConfigs)
-              Choices.PRACTITIONERS -> deployVerticle(OpenSRPPractitionerVerticle(), verticleConfigs)
-              Choices.KEYCLOAK_USERS -> deployVerticle(KeycloakUserVerticle(), verticleConfigs)
-              Choices.ORGANIZATION_LOCATIONS -> deployVerticle(OpenSRPOrganizationLocationVerticle(), verticleConfigs)
-              Choices.PRACTITIONER_ROLES -> deployVerticle(OpenSRPPractitionerRoleVerticle(), verticleConfigs)
+              DataItem.ORGANIZATIONS -> deployVerticle(OpenSRPOrganizationVerticle(), verticleConfigs)
+              DataItem.PRACTITIONERS -> deployVerticle(OpenSRPPractitionerVerticle(), verticleConfigs)
+              DataItem.KEYCLOAK_USERS -> deployVerticle(KeycloakUserVerticle(), verticleConfigs)
+              DataItem.ORGANIZATION_LOCATIONS -> deployVerticle(OpenSRPOrganizationLocationVerticle(), verticleConfigs)
+              DataItem.PRACTITIONER_ROLES -> deployVerticle(OpenSRPPractitionerRoleVerticle(), verticleConfigs)
             }
 
           } else {

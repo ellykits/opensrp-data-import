@@ -16,6 +16,7 @@ import org.smartregister.dataimport.openmrs.OpenMRSLocationVerticle
 import org.smartregister.dataimport.shared.*
 import org.smartregister.dataimport.shared.model.*
 import java.io.FileReader
+import java.io.IOException
 import java.util.*
 
 /**
@@ -27,6 +28,12 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   private var locationIds = mutableMapOf<String, String>()
 
+  private var usersMap = mapOf<String, List<KeycloakUser>>()
+
+  private val organizations = mutableListOf<Organization>()
+
+  private val organizationLocations = mutableListOf<OrganizationLocation>()
+
   override suspend fun start() {
     super.start()
 
@@ -34,13 +41,38 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
     if (sourceFile.isNullOrBlank()) {
       vertx.deployVerticle(OpenMRSLocationVerticle())
-      consumeData(
+      consumeOpenMRSData(
         countAddress = EventBusAddress.OPENMRS_LOCATIONS_COUNT,
         loadAddress = EventBusAddress.OPENMRS_LOCATIONS_LOAD,
-        block = this::postLocations
+        action = this::postLocations
       )
     } else {
+      val usersFile = config.getString(USERS_FILE)
+      if (usersFile.isNotBlank()) {
+        extractUsersFromCSV(usersFile)
+      }
       extractLocationsFromCSV(sourceFile)
+    }
+
+    try {
+      vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler {
+        launch(vertx.dispatcher()) {
+          val dataItem = DataItem.valueOf(it.body())
+          if (dataItem == DataItem.LOCATIONS) {
+            val organizationsChunked = organizations.chunked(limit)
+            consumeCSVData(organizationsChunked, DataItem.ORGANIZATIONS) {
+              postData(config.getString("opensrp.rest.organization.url"), it, DataItem.ORGANIZATIONS)
+            }
+          } else if (dataItem == DataItem.ORGANIZATIONS) {
+            val organizationLocationsChunked = organizationLocations.chunked(limit)
+            consumeCSVData(organizationLocationsChunked, DataItem.ORGANIZATION_LOCATIONS) {
+              postData(config.getString("opensrp.rest.organization.location.url"), it, DataItem.ORGANIZATION_LOCATIONS)
+            }
+          }
+        }
+      }
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
     }
   }
 
@@ -61,6 +93,17 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     }
   }
 
+  private suspend fun extractUsersFromCSV(usersFile: String) {
+    usersMap = vertx.executeBlocking<Map<String, List<KeycloakUser>>> { promise ->
+      try {
+        val users = readCsvData<KeycloakUser>(usersFile, true, 1).groupBy { it.parentLocation + it.location }
+        promise.complete(users)
+      } catch (exception: IOException) {
+        vertx.exceptionHandler().handle(exception)
+      }
+    }.await()
+  }
+
   private suspend fun extractLocationsFromCSV(sourceFile: String?) {
     val geoLevels = config.getString("location.hierarchy")
       .split(',').associateByTo(mutableMapOf(), { key: String ->
@@ -68,6 +111,9 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       }, { value: String ->
         value.split(":").last().trim().toInt()
       })
+
+    //Generate team and users for locations tagged with hasTeam
+    val generateTeams = config.getString(GENERATE_TEAMS, "")
 
     val locationTags = webRequest(HttpMethod.GET, config.getString("opensrp.rest.location.tag.url"))?.body()
 
@@ -97,9 +143,6 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           logError(promise, exception.localizedMessage)
         }
 
-        //Generate team and users for locations tagged with hasTeam
-        val generateTeams = config.getString(GENERATE_TEAMS, "")
-
         locations.filter { it.hasTeam }.associateBy { it.id }.map { it.value }.forEach {
           if (generateTeams.isNotBlank()) {
             createOrganizations(it)
@@ -109,31 +152,8 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         promise.complete(newLocations)
       }.await()
 
-
-      val counter = vertx.sharedData().getCounter(COUNTER).await()
-      vertx.setPeriodic(requestInterval) { timerId ->
-        launch(vertx.dispatcher()) {
-          val index: Int = counter.andIncrement.await().toInt()
-          if (index >= locationsData.size) {
-            endOperation(EventBusAddress.OPENMRS_LOCATIONS_LOAD)
-            val organizations = readCsvData<Organization>(Choices.ORGANIZATIONS.name.lowercase())
-            val organizationLocations =
-              readCsvData<OrganizationLocation>(Choices.ORGANIZATION_LOCATIONS.name.lowercase())
-            println("Organizations: ${organizations.size}")
-            println("Organization Locations: ${organizationLocations.size}")
-            vertx.cancelTimer(timerId)
-          }
-          if (index < locationsData.size) {
-            val locations = locationsData[index]
-            val payload = JsonArray(Json.encodeToString(locations))
-            try {
-              webRequest(url = config.getString("opensrp.rest.location.url"), payload = payload)?.logHttpResponse()
-              logger.info("Posted ${locations.size} locations")
-            } catch (throwable: Throwable) {
-              vertx.exceptionHandler().handle(throwable)
-            }
-          }
-        }
+      consumeCSVData(csvData = locationsData, DataItem.LOCATIONS) {
+        postData(config.getString("opensrp.rest.location.url"), it, DataItem.LOCATIONS)
       }
     }
   }
@@ -213,7 +233,8 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           geographicalLevel = geoLevels.getOrDefault(locationTag, 0)
         ),
         isNew = isNewLocation,
-        hasTeam = config.getString(GENERATE_TEAMS, "").equals(locationTag, ignoreCase = true)
+        hasTeam = config.getString(GENERATE_TEAMS, "").equals(locationTag, ignoreCase = true),
+        uniqueName = key
       )
 
       locations.add(location)
@@ -237,17 +258,19 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       try {
         val organizationId = UUID.randomUUID().toString()
 
-        vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
-          put(FILE_NAME, Choices.ORGANIZATIONS.name.lowercase())
-          put(
-            PAYLOAD,
-            JsonObject(Json.encodeToString(Organization(identifier = organizationId, name = "Team ${properties.name}")))
-          )
-        })
+        val organization = Organization(identifier = organizationId, name = "Team ${properties.name}")
+        organizations.add(organization)
 
         vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
-          put(FILE_NAME, Choices.ORGANIZATION_LOCATIONS.name.lowercase())
-          put(PAYLOAD, JsonObject(Json.encodeToString(OrganizationLocation(organizationId, id))))
+          put(FILE_NAME, DataItem.ORGANIZATIONS.name.lowercase())
+          put(PAYLOAD, JsonObject(jsonEncoder().encodeToString(organization)))
+        })
+
+        val organizationLocation = OrganizationLocation(organizationId, id)
+        organizationLocations.add(organizationLocation)
+        vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
+          put(FILE_NAME, DataItem.ORGANIZATION_LOCATIONS.name.lowercase())
+          put(PAYLOAD, JsonObject(jsonEncoder().encodeToString(organizationLocation)))
         })
 
       } catch (throwable: Throwable) {
