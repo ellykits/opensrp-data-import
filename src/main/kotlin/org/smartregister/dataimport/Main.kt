@@ -28,9 +28,12 @@ class Application : CliktCommand(name = "opensrp-data-import") {
     names = arrayOf("--source-file", "-s")
   )
 
-  private val skipLocationTags: Boolean by option("--skip-location-tags", "-sLT" ).flag(default = false)
+  private val generateTeams: String? by option(
+    help = "Indicate the Location Level to Assign teams",
+    names = arrayOf("--generate-teams-at", "-gTA")
+  )
 
-  private val createTeams: Boolean by option("--create-teams", "-cT" ).flag(default = false)
+  private val skipLocationTags: Boolean by option("--skip-location-tags", "-sLT").flag(default = false)
 
   private val importOption: String? by option(
     help = """
@@ -59,7 +62,7 @@ class Application : CliktCommand(name = "opensrp-data-import") {
     getChoice(Choices.PRACTITIONER_ROLES)
   )
 
-  private fun getChoice(choices: Choices) = choices.name.toLowerCase()
+  private fun getChoice(choices: Choices) = choices.name.lowercase()
 
   override fun run() {
     val mainVerticle = MainVerticle()
@@ -71,7 +74,7 @@ class Application : CliktCommand(name = "opensrp-data-import") {
         put(IMPORT_OPTION, importOption)
         put(SOURCE_FILE, sourceFile)
         put(SKIP_LOCATION_TAGS, skipLocationTags)
-        put(CREATE_TEAMS, createTeams)
+        put(GENERATE_TEAMS, generateTeams)
       }
 
       vertx.deployVerticle(mainVerticle, deploymentOptionsOf(config = configs))

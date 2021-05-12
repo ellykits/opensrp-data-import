@@ -10,11 +10,13 @@ data class Location(
   val properties: LocationProperties,
   val locationTags: List<LocationTag>? = null,
   @Transient
-  var isNew: Boolean = false
+  var isNew: Boolean = false,
+  @Transient
+  var hasTeam: Boolean = false
 )
 
 @Serializable
-data class LocationProperties (
+data class LocationProperties(
   val status: String = "Active",
   var parentId: String = "",
   val name: String,

@@ -1,13 +1,18 @@
 package org.smartregister.dataimport.shared.model
 
+import com.opencsv.bean.CsvBindByPosition
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class Organization(
+  @CsvBindByPosition(position = 0)
   val identifier: String,
+  @CsvBindByPosition(position = 1)
   val active: Boolean = true,
+  @CsvBindByPosition(position = 2)
   val name: String,
-  val type: OrganizationCoding
+
+  val type: OrganizationCoding = OrganizationCoding()
 )
 
 @Serializable

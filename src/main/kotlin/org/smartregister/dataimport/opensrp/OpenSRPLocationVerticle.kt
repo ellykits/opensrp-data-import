@@ -27,10 +27,6 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   private var locationIds = mutableMapOf<String, String>()
 
-  private var organizations = mutableListOf<Organization>()
-
-  private var organizationLocations = mutableListOf<OrganizationLocation>()
-
   override suspend fun start() {
     super.start()
 
@@ -45,6 +41,23 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       )
     } else {
       extractLocationsFromCSV(sourceFile)
+    }
+  }
+
+  private suspend fun postLocations(locations: JsonArray) {
+    launch(Dispatchers.IO) {
+      locations.forEach { location ->
+        //Delete locationTags attributes for locations without tags
+        if (location is JsonObject && location.containsKey(LOCATION_TAGS)) {
+          val locationTags = location.getJsonArray(LOCATION_TAGS)
+          locationTags.forEach { tag ->
+            if (tag is JsonObject && tag.getString(ID) == null) {
+              location.remove(LOCATION_TAGS)
+            }
+          }
+        }
+      }
+      webRequest(url = config.getString("opensrp.rest.location.url"), payload = locations)?.logHttpResponse()
     }
   }
 
@@ -83,9 +96,20 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         } catch (exception: NoSuchFileException) {
           logError(promise, exception.localizedMessage)
         }
+
+
+        //Generate team and users for locations tagged with hasTeam
+        val generateTeams = config.getString(GENERATE_TEAMS, "")
+
+        locations.filter { it.hasTeam }.associateBy { it.id }.map { it.value }.forEach {
+          if (generateTeams.isNotBlank()) {
+            createOrganizations(it)
+          }
+        }
         val newLocations = locations.filter { it.isNew }.associateBy { it.id }.map { it.value }.chunked(limit)
         promise.complete(newLocations)
       }.await()
+
 
       val counter = vertx.sharedData().getCounter(COUNTER).await()
       vertx.setPeriodic(requestInterval) { timerId ->
@@ -96,10 +120,11 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
             vertx.cancelTimer(timerId)
           }
           if (index < locationsData.size) {
-            val payload = JsonArray(Json.encodeToString(locationsData[index]))
+            val locations = locationsData[index]
+            val payload = JsonArray(Json.encodeToString(locations))
             try {
               webRequest(url = config.getString("opensrp.rest.location.url"), payload = payload)?.logHttpResponse()
-              logger.info("Posted ${locationsData[index].size} locations")
+              logger.info("Posted ${locations.size} locations")
             } catch (throwable: Throwable) {
               vertx.exceptionHandler().handle(throwable)
             }
@@ -150,7 +175,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     vertx.close()
   }
 
-  private fun processLocations(header: Array<String>, record: Array<String>, geoLevels: MutableMap<String, Int>)
+  private fun processLocations(header: Array<String>, cells: Array<String>, geoLevels: MutableMap<String, Int>)
     : List<Location> {
 
     var parentIdPos = 0
@@ -159,7 +184,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     var namePos = 3
 
     val locations = mutableListOf<Location>()
-    val zippedList = header.zip(record) //Combine header with row to know the correct location level for the value
+    val zippedList = header.zip(cells) //Combine header with row to know the correct location level for the value
 
     do {
       val locationTag = zippedList[namePos].first
@@ -183,7 +208,8 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           name = name,
           geographicalLevel = geoLevels.getOrDefault(locationTag, 0)
         ),
-        isNew = isNewLocation
+        isNew = isNewLocation,
+        hasTeam = config.getString(GENERATE_TEAMS, "").equals(locationTag, ignoreCase = true)
       )
 
       locations.add(location)
@@ -202,20 +228,24 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       })
   }
 
-  private suspend fun postLocations(locations: JsonArray) {
-    launch(Dispatchers.IO) {
-      locations.forEach { location ->
-        //Delete locationTags attributes for locations without tags
-        if (location is JsonObject && location.containsKey(LOCATION_TAGS)) {
-          val locationTags = location.getJsonArray(LOCATION_TAGS)
-          locationTags.forEach { tag ->
-            if (tag is JsonObject && tag.getString(ID) == null) {
-              location.remove(LOCATION_TAGS)
-            }
-          }
-        }
+  private fun createOrganizations(location: Location) {
+    with(location){
+      try {
+        val organizationId = UUID.randomUUID().toString()
+
+        vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
+          put(FILE_NAME, Choices.ORGANIZATIONS.name.lowercase())
+          put(PAYLOAD, JsonObject(Json.encodeToString(Organization(identifier = organizationId, name = "Team ${properties.name}"))))
+        })
+
+        vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
+          put(FILE_NAME, Choices.ORGANIZATION_LOCATIONS.name.lowercase())
+          put(PAYLOAD, JsonObject(Json.encodeToString(OrganizationLocation(organizationId, id))))
+        })
+
+      } catch (throwable: Throwable) {
+        vertx.exceptionHandler().handle(throwable)
       }
-      webRequest(url = config.getString("opensrp.rest.location.url"), payload = locations)?.logHttpResponse()
     }
   }
 }

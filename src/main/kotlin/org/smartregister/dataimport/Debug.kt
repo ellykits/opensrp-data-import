@@ -4,7 +4,7 @@ import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.core.deploymentOptionsOf
 import org.smartregister.dataimport.main.MainVerticle
-import org.smartregister.dataimport.opensrp.OpenSRPLocationVerticle
+import org.smartregister.dataimport.shared.GENERATE_TEAMS
 import org.smartregister.dataimport.shared.IMPORT_OPTION
 import org.smartregister.dataimport.shared.SKIP_LOCATION_TAGS
 import org.smartregister.dataimport.shared.SOURCE_FILE
@@ -18,6 +18,7 @@ fun main() {
     put(IMPORT_OPTION, "locations")
     put(SOURCE_FILE, "assets/locations.csv")
     put(SKIP_LOCATION_TAGS, true)
+    put(GENERATE_TEAMS, "Health Facility")
   }
   Vertx.vertx().deployVerticle(MainVerticle(), deploymentOptionsOf(config = configs))
 }

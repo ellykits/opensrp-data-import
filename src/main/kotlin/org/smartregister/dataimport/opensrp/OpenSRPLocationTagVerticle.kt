@@ -29,7 +29,7 @@ class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
             ?.logHttpResponse()
         }
       }
-      deployVerticle(OpenSRPLocationVerticle(), JsonObject().put(SOURCE_FILE, config.getString(SOURCE_FILE)))
+      deployVerticle(OpenSRPLocationVerticle(), getVerticleCommonConfigs().put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, "")))
     }
   }
 }
