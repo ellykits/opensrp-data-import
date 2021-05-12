@@ -20,7 +20,7 @@ class OpenSRPOrganizationVerticle : BaseOpenSRPVerticle() {
   }
 
   private suspend fun postTeams(teams: JsonArray) {
-     webRequest(url = config.getString("opensrp.rest.organization.url"), payload = teams)
+    webRequest(url = config.getString("opensrp.rest.organization.url"), payload = teams)
       ?.logHttpResponse()
   }
 }

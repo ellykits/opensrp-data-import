@@ -4,9 +4,16 @@ import com.opencsv.bean.CsvBindByPosition
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class OrganizationLocation(
+class OrganizationLocation() {
+
+  constructor(organization: String, jurisdiction: String) : this() {
+    this.organization = organization
+    this.jurisdiction = jurisdiction
+  }
+
   @CsvBindByPosition(position = 0)
-  val organization: String,
-  @CsvBindByPosition (position = 1)
-  val jurisdiction: String
-)
+  var organization: String? = null
+
+  @CsvBindByPosition(position = 1)
+  var jurisdiction: String? = null
+}

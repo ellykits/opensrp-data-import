@@ -28,22 +28,24 @@ class MainVerticle : BaseVerticle() {
 
           val verticleConfigs = getVerticleCommonConfigs()
           val csvGeneratorVerticleId = vertx.deployVerticle(CsvGeneratorVerticle()).await()
-          if (choice != null && csvGeneratorVerticleId != null ) {
-              when (Choices.valueOf(choice.uppercase())) {
-                Choices.LOCATIONS -> deployVerticle(OpenSRPLocationTagVerticle(), verticleConfigs
-                  .put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, "")))
-                Choices.ORGANIZATIONS -> deployVerticle(OpenSRPOrganizationVerticle(), verticleConfigs)
-                Choices.PRACTITIONERS -> deployVerticle(OpenSRPPractitionerVerticle(), verticleConfigs)
-                Choices.KEYCLOAK_USERS -> deployVerticle(KeycloakUserVerticle(), verticleConfigs)
-                Choices.ORGANIZATION_LOCATIONS -> deployVerticle(OpenSRPOrganizationLocationVerticle(), verticleConfigs)
-                Choices.PRACTITIONER_ROLES -> deployVerticle(OpenSRPPractitionerRoleVerticle(), verticleConfigs)
-              }
-
-            } else {
-              logger.error("Nothing to deploy")
+          if (choice != null && csvGeneratorVerticleId != null) {
+            when (Choices.valueOf(choice.uppercase())) {
+              Choices.LOCATIONS -> deployVerticle(
+                OpenSRPLocationTagVerticle(), verticleConfigs
+                  .put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, ""))
+              )
+              Choices.ORGANIZATIONS -> deployVerticle(OpenSRPOrganizationVerticle(), verticleConfigs)
+              Choices.PRACTITIONERS -> deployVerticle(OpenSRPPractitionerVerticle(), verticleConfigs)
+              Choices.KEYCLOAK_USERS -> deployVerticle(KeycloakUserVerticle(), verticleConfigs)
+              Choices.ORGANIZATION_LOCATIONS -> deployVerticle(OpenSRPOrganizationLocationVerticle(), verticleConfigs)
+              Choices.PRACTITIONER_ROLES -> deployVerticle(OpenSRPPractitionerRoleVerticle(), verticleConfigs)
             }
+
+          } else {
+            logger.error("Nothing to deploy")
           }
         }
       }
     }
+  }
 }

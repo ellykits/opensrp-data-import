@@ -97,7 +97,6 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           logError(promise, exception.localizedMessage)
         }
 
-
         //Generate team and users for locations tagged with hasTeam
         val generateTeams = config.getString(GENERATE_TEAMS, "")
 
@@ -117,6 +116,11 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           val index: Int = counter.andIncrement.await().toInt()
           if (index >= locationsData.size) {
             endOperation(EventBusAddress.OPENMRS_LOCATIONS_LOAD)
+            val organizations = readCsvData<Organization>(Choices.ORGANIZATIONS.name.lowercase())
+            val organizationLocations =
+              readCsvData<OrganizationLocation>(Choices.ORGANIZATION_LOCATIONS.name.lowercase())
+            println("Organizations: ${organizations.size}")
+            println("Organization Locations: ${organizationLocations.size}")
             vertx.cancelTimer(timerId)
           }
           if (index < locationsData.size) {
@@ -229,13 +233,16 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private fun createOrganizations(location: Location) {
-    with(location){
+    with(location) {
       try {
         val organizationId = UUID.randomUUID().toString()
 
         vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
           put(FILE_NAME, Choices.ORGANIZATIONS.name.lowercase())
-          put(PAYLOAD, JsonObject(Json.encodeToString(Organization(identifier = organizationId, name = "Team ${properties.name}"))))
+          put(
+            PAYLOAD,
+            JsonObject(Json.encodeToString(Organization(identifier = organizationId, name = "Team ${properties.name}")))
+          )
         })
 
         vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {

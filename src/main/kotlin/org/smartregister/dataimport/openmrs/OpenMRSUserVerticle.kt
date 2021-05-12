@@ -7,7 +7,7 @@ import org.smartregister.dataimport.shared.PRACTITIONERS
 /**
  * This subclass of [BaseOpenMRSVerticle] returns all users in OpenMRS
  */
-class OpenMRSUserVerticle: BaseOpenMRSVerticle() {
+class OpenMRSUserVerticle : BaseOpenMRSVerticle() {
   override suspend fun start() {
 
     super.start()

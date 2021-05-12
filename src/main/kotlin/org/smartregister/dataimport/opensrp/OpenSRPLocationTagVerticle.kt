@@ -14,22 +14,25 @@ class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
   override suspend fun start() {
     super.start()
     launch(vertx.dispatcher()) {
-      if(!config.getBoolean(SKIP_LOCATION_TAGS)) {
+      if (!config.getBoolean(SKIP_LOCATION_TAGS)) {
         config.getString("location.hierarchy")
           .split(',')
           .map { it.split(":").first().trim() }
           .forEach {
 
-          val locationTag = JsonObject()
-            .put(NAME, it)
-            .put(DESCRIPTION, "$it Tag")
-            .put(ACTIVE, true)
+            val locationTag = JsonObject()
+              .put(NAME, it)
+              .put(DESCRIPTION, "$it Tag")
+              .put(ACTIVE, true)
 
-          webRequest(HttpMethod.POST, url = config.getString("opensrp.rest.location.tag.url"), payload = locationTag)
-            ?.logHttpResponse()
-        }
+            webRequest(HttpMethod.POST, url = config.getString("opensrp.rest.location.tag.url"), payload = locationTag)
+              ?.logHttpResponse()
+          }
       }
-      deployVerticle(OpenSRPLocationVerticle(), getVerticleCommonConfigs().put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, "")))
+      deployVerticle(
+        OpenSRPLocationVerticle(),
+        getVerticleCommonConfigs().put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, ""))
+      )
     }
   }
 }

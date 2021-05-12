@@ -2,6 +2,7 @@ package org.smartregister.dataimport.shared
 
 import com.opencsv.CSVWriter
 import com.opencsv.bean.ColumnPositionMappingStrategy
+import com.opencsv.bean.CsvToBeanBuilder
 import com.opencsv.bean.StatefulBeanToCsvBuilder
 import io.vertx.circuitbreaker.CircuitBreaker
 import io.vertx.circuitbreaker.CircuitBreakerOptions
@@ -27,6 +28,7 @@ import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.FileNotFoundException
+import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
 import java.nio.file.FileSystems
@@ -189,9 +191,8 @@ abstract class BaseVerticle : CoroutineVerticle() {
         type = T::class.java
       }
 
-      mappingStrategy.setColumnMapping()
-
-      val beanWriter = builder.withMappingStrategy(mappingStrategy).withQuotechar(CSVWriter.NO_QUOTE_CHARACTER)
+      val beanWriter = builder.withMappingStrategy(mappingStrategy)
+        .withQuotechar(CSVWriter.NO_QUOTE_CHARACTER)
         .build()
 
       beanWriter.write(Json.decodeFromString<T>(payload))
@@ -203,8 +204,28 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
-  protected inline fun <reified T> postCsvData(){
+  protected inline fun <reified T> readCsvData(fileName: String): List<T> {
+    val reader = FileReader("$dataDirectoryPath$fileName.csv")
+    val mappingStrategy = ColumnPositionMappingStrategy<T>().apply { type = T::class.java }
+    val csvData = mutableListOf<T>()
 
+    try {
+      val csvToBean = CsvToBeanBuilder<T>(reader)
+        .withType(T::class.java)
+        .withIgnoreLeadingWhiteSpace(true)
+        .withMappingStrategy(mappingStrategy)
+        .build()
+
+      val iterator: MutableIterator<T> = csvToBean.iterator()
+      while (iterator.hasNext()) {
+        csvData.add(iterator.next())
+      }
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
+    } finally {
+      reader.close()
+    }
+    return csvData
   }
 
   companion object {

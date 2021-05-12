@@ -12,6 +12,6 @@ data class PractitionerRole(
 )
 
 @Serializable
-data class PractitionerCode (
+data class PractitionerCode(
   val text: String = "Health Worker"
 )
