@@ -243,16 +243,29 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected fun <T> consumeCSVData(csvData: List<List<T>>, dataItem: DataItem, action: suspend (List<T>) -> Unit) {
     if (csvData.isEmpty()) {
-      logger.info("TASK IGNORED: NO ${dataItem.name.lowercase()} data to migrate to OpenSRP.")
+      logger.info("TASK IGNORED: NO ${dataItem.name.lowercase()} data to migrate to OpenSRP")
+      logger.warn("SHUTDOWN: Stopping gracefully...(Press Ctrl + C) to force")
+      vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
       return
     }
     try {
       launch(vertx.dispatcher()) {
+        // do not create counter for key as requests are made one by one
+        when (dataItem) {
+          DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUPS -> {
+            logger.info("TASK STARTED: Started single request tasks with ${requestInterval / 1000} seconds intervals")
+          }
+          else -> {
+            val counter = vertx.sharedData().getCounter(dataItem.name).await()
+            val requestsCount = counter.addAndGet(csvData.size.toLong()).await()
+            logger.info("TASK STARTED: Submitting $requestsCount Request(s) with ${requestInterval / 1000} seconds interval")
+          }
+        }
+
         for ((index, _) in csvData.withIndex()) {
           awaitEvent<Long> { vertx.setTimer(requestInterval, it) }
           action(csvData[index])
         }
-        completeTask(dataItem = dataItem)
       }
     } catch (throwable: Throwable) {
       vertx.exceptionHandler().handle(throwable)
@@ -267,7 +280,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       EventBusAddress.OPENMRS_LOCATIONS_LOAD -> "locations"
       else -> "data"
     }
-    logger.info("TASK COMPLETED: ${dataItem?.name?.lowercase() ?: data} data migrated.")
+    logger.info("TASK COMPLETED: ${dataItem?.name?.lowercase() ?: data} data migrated")
     if (dataItem != null) vertx.eventBus().send(EventBusAddress.TASK_COMPLETE, dataItem.name)
     if (timerId != null) vertx.cancelTimer(timerId)
   }

@@ -5,6 +5,7 @@ import io.vertx.core.eventbus.Message
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpResponse
+import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
@@ -45,11 +46,25 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
     }
   }
 
+  /**
+   * Post [data] to the provided [url] keeping track of the number of responses from the server.This will help in correctly
+   * determining whether the task is fully completed. The counter starts off with number of requests sent to the server.
+   * When 0 it means that was the last request.
+   */
   protected suspend inline fun <reified T> postData(url: String, data: List<T>, dataItem: DataItem) {
     val payload = JsonArray(jsonEncoder().encodeToString(data))
+    val counter = vertx.sharedData().getCounter(dataItem.name).await()
     try {
-      awaitResult<HttpResponse<Buffer>?> { webRequest(url = url, payload = payload, handler = it) }?.logHttpResponse()
-      logger.info("Posted ${data.size} ${dataItem.name.lowercase()} to OpenSRP")
+      awaitResult<HttpResponse<Buffer>?> { webRequest(url = url, payload = payload, handler = it) }
+        ?.run {
+          logHttpResponse()
+          logger.info("Posted ${data.size} ${dataItem.name.lowercase()} to OpenSRP")
+          val currentCount = counter.decrementAndGet().await()
+
+          if (currentCount == 0L) {
+            completeTask(dataItem = dataItem)
+          }
+        }
     } catch (throwable: Throwable) {
       vertx.exceptionHandler().handle(throwable)
     }

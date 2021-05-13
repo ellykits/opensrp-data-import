@@ -24,6 +24,13 @@ class MainVerticle : BaseVerticle() {
     val authVerticleId = vertx.deployVerticle(OpenSRPAuthVerticle()).await()
     if (authVerticleId != null) deployedVerticleIds.add(authVerticleId)
 
+    //Listen to shutdown request
+    vertx.eventBus().consumer<Boolean>(EventBusAddress.APP_SHUTDOWN).handler { message ->
+      if (message.body()) {
+        vertx.close()
+      }
+    }
+
     vertx.eventBus().consumer<Boolean>(EventBusAddress.OAUTH_TOKEN_RECEIVED).handler { message ->
       launch(vertx.dispatcher()) {
         if (message.body()) {
