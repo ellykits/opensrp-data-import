@@ -59,18 +59,15 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
         ?.run {
           logHttpResponse()
           logger.info("Posted ${data.size} ${dataItem.name.lowercase()} to OpenSRP")
-          val currentCount = counter.decrementAndGet().await()
-
-          if (currentCount == 0L) {
-            completeTask(dataItem = dataItem)
-          }
+          checkTaskCompletion(counter, dataItem)
         }
     } catch (throwable: Throwable) {
       vertx.exceptionHandler().handle(throwable)
     }
   }
 
-  protected inline fun <reified T> sendData(address: String, data: List<T>) {
+  protected suspend inline fun <reified T> sendData(address: String, dataItem: DataItem, data: List<T>) {
+    vertx.sharedData().getCounter(dataItem.name).await().addAndGet(data.size.toLong()).await()
     val payload = JsonArray(jsonEncoder().encodeToString(data))
     vertx.eventBus().send(address, payload)
   }
@@ -80,7 +77,7 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
       with(it.body()) {
         val username = getString(USERNAME)
         val keycloakId = getString(ID)
-        logger.info("Setting user id $keycloakId for user $username")
+        logger.info("Keycloak user Id set for $username")
         userIdsMap[username] = keycloakId
       }
     }

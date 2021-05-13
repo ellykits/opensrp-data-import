@@ -13,6 +13,7 @@ import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
+import io.vertx.core.shareddata.Counter
 import io.vertx.ext.auth.User
 import io.vertx.ext.web.client.HttpRequest
 import io.vertx.ext.web.client.HttpResponse
@@ -253,8 +254,8 @@ abstract class BaseVerticle : CoroutineVerticle() {
             logger.info("TASK STARTED: Started single request tasks with ${requestInterval / 1000} seconds intervals")
           }
           else -> {
-            val counter = vertx.sharedData().getCounter(dataItem.name).await()
-            val requestsCount = counter.addAndGet(csvData.size.toLong()).await()
+            val requestsCount =
+              vertx.sharedData().getCounter(dataItem.name).await().addAndGet(csvData.size.toLong()).await()
             logger.info("TASK STARTED: Submitting $requestsCount Request(s) with ${requestInterval / 1000} seconds interval")
           }
         }
@@ -269,6 +270,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
+
   protected fun completeTask(dataLoadAddress: String = "data", dataItem: DataItem? = null, timerId: Long? = null) {
     val data = when (dataLoadAddress) {
       EventBusAddress.OPENMRS_USERS_LOAD -> "users"
@@ -280,6 +282,13 @@ abstract class BaseVerticle : CoroutineVerticle() {
     logger.info("TASK COMPLETED: ${dataItem?.name?.lowercase() ?: data} data migrated")
     if (dataItem != null) vertx.eventBus().send(EventBusAddress.TASK_COMPLETE, dataItem.name)
     if (timerId != null) vertx.cancelTimer(timerId)
+  }
+
+  protected suspend fun checkTaskCompletion(counter: Counter, dataItem: DataItem) {
+      val currentCount = counter.decrementAndGet().await()
+      if (currentCount == 0L) {
+        completeTask(dataItem = dataItem)
+      }
   }
 
   companion object {

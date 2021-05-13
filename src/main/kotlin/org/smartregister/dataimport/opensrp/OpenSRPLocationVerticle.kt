@@ -63,7 +63,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
         extractLocationsFromCSV(sourceFile)
 
-        executeTasks()
+        cascadeDataImportation()
         //Update Map with keycloak user ids
         updateUserIds(userIdsMap)
       } catch (throwable: Throwable) {
@@ -72,7 +72,11 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     }
   }
 
-  private fun executeTasks() {
+
+  private fun cascadeDataImportation() {
+
+    //Begin by posting locations from CSV, then organization, map organizations to locations, post keycloak users,
+    // create practitioners and finally assign practitioners to organizations
     try {
       vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler { message ->
         when (DataItem.valueOf(message.body())) {
@@ -94,21 +98,22 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
             keycloakUsers = organizationUsers.map { it.value }.flatten().onEach {
               it.organizationLocationId = locationIds[it.parentLocation + it.location]
             }
+
             logger.info("Posting ${keycloakUsers.size} users to Keycloak")
 
             val keycloakUsersChunked = keycloakUsers.chunked(limit)
             consumeCSVData(keycloakUsersChunked, DataItem.KEYCLOAK_USERS) {
-              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD, it)
+              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD,  DataItem.KEYCLOAK_USERS, it)
             }
           }
           DataItem.KEYCLOAK_USERS -> {
             val usernames = keycloakUsers.filter { it.username != null }.map { it.username!! }
             val usernamesChunked = usernames.chunked(limit)
             consumeCSVData(usernamesChunked, DataItem.KEYCLOAK_USERS_GROUPS) {
-              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN, it)
+              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN,  DataItem.KEYCLOAK_USERS_GROUPS, it)
             }
           }
-          else -> logger.warn("IDLING...WAIT for all the requests to be processed then SHUTDOWN (Press Ctrl + C)")
+          else -> logger.warn("IDLING...(Press Ctrl + C) to shutdown)")
         }
       }
     } catch (throwable: Throwable) {
@@ -218,7 +223,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       return false
     }
 
-    //Columns MUST be named in the order of location level with the id column preceding the level e.g. Country Id, Country, Province Id, Province
+    //Format: Location level ID column followed by the level e.g. Country Id, Country, Province Id, Province
     headers.toList().chunked(2).onEach {
       val (levelId, level) = it
 
@@ -247,7 +252,6 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     } else {
       vertx.exceptionHandler().handle(DataImportException(message))
     }
-    vertx.close()
   }
 
   private fun processLocations(header: Array<String>, cells: Array<String>, geoLevels: MutableMap<String, Int>)

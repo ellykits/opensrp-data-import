@@ -21,7 +21,9 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
   override suspend fun start() {
     super.start()
 
-    if (config.getString(SOURCE_FILE, "").isNullOrBlank()) {
+    loadFromOpenMRS = config.getString(SOURCE_FILE, "").isNullOrBlank()
+
+    if (loadFromOpenMRS) {
 
       vertx.deployVerticle(OpenMRSUserVerticle()).await()
 
@@ -35,7 +37,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
       }
 
       vertx.eventBus().consumer<JsonArray>(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN).handler {
-        launch(vertx.dispatcher())  {
+        launch(vertx.dispatcher()) {
           assignUsersToProviderGroup(it.body())
         }
       }
@@ -69,6 +71,8 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
   }
 
   private suspend fun createUser(users: JsonArray) {
+
+
     if (!users.isEmpty) {
       //Filter out openmrs & daemon users as they are no longer needed
       try {
@@ -84,7 +88,13 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
                 },
                 handler = it
               )
-            }?.logHttpResponse()
+            }?.run {
+              logHttpResponse()
+              if (!loadFromOpenMRS) {
+                val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS.name).await()
+                checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS)
+              }
+            }
           }
       } catch (throwable: Throwable) {
         logger.error("$concreteClassName::Error creating Keycloak User")

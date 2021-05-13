@@ -4,6 +4,7 @@ import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpResponse
+import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import org.smartregister.dataimport.shared.*
 
@@ -12,6 +13,7 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
   protected lateinit var baseUrl: String
 
   protected var providerGroupId: String? = null
+  protected var loadFromOpenMRS: Boolean = false
 
   override suspend fun start() {
     super.start()
@@ -36,14 +38,18 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
     if (providerGroupId == null) {
       throw DataImportException("Provider Group Missing!")
     }
+
+
     val url = "$baseUrl/$userId/groups/$providerGroupId"
     awaitResult<HttpResponse<Buffer>?> {
-      webRequest(
-        method = HttpMethod.PUT,
-        url = url,
-        handler = it
-      )
-    }?.logHttpResponse()
+      webRequest(method = HttpMethod.PUT, url = url, handler = it)
+    }?.run {
+      logHttpResponse()
+      if (!loadFromOpenMRS) {
+        val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS_GROUPS.name).await()
+        checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUPS)
+      }
+    }
   }
 
   /**
