@@ -38,6 +38,10 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   private val organizationLocations = mutableListOf<OrganizationLocation>()
 
+  private var practitioners = listOf<Practitioner>()
+
+  private var practitionerRoles = listOf<PractitionerRole>()
+
   private val userIdsMap = TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
 
   override suspend fun start() {
@@ -74,7 +78,6 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
 
   private fun cascadeDataImportation() {
-
     //Begin by posting locations from CSV, then organization, map organizations to locations, post keycloak users,
     // create practitioners and finally assign practitioners to organizations
     try {
@@ -96,30 +99,65 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           }
           DataItem.ORGANIZATION_LOCATIONS -> {
             keycloakUsers = organizationUsers.map { it.value }.flatten().onEach {
-              it.organizationLocationId = locationIds[it.parentLocation + it.location]
+              it.orgLocId = locationIds[it.parentLocation + it.location]
             }
-
             logger.info("Posting ${keycloakUsers.size} users to Keycloak")
-
             val keycloakUsersChunked = keycloakUsers.chunked(limit)
             consumeCSVData(keycloakUsersChunked, DataItem.KEYCLOAK_USERS) {
-              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD,  DataItem.KEYCLOAK_USERS, it)
+              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD, DataItem.KEYCLOAK_USERS, it)
             }
           }
           DataItem.KEYCLOAK_USERS -> {
             val usernames = keycloakUsers.filter { it.username != null }.map { it.username!! }
+            logger.info("Assigning ${usernames.size} users to 'Provider' group")
             val usernamesChunked = usernames.chunked(limit)
             consumeCSVData(usernamesChunked, DataItem.KEYCLOAK_USERS_GROUPS) {
-              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN,  DataItem.KEYCLOAK_USERS_GROUPS, it)
+              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN, DataItem.KEYCLOAK_USERS_GROUPS, it)
             }
           }
-          else -> logger.warn("IDLING...(Press Ctrl + C) to shutdown)")
+          DataItem.KEYCLOAK_USERS_GROUPS -> {
+            practitioners = generatePractitioners()
+            consumeCSVData(practitioners.chunked(limit), DataItem.PRACTITIONERS) {
+              postData(config.getString("opensrp.rest.practitioner.url"), it, DataItem.PRACTITIONERS)
+            }
+          }
+          DataItem.PRACTITIONERS -> {
+            practitionerRoles = generatePractitionerRoles()
+            consumeCSVData(practitionerRoles.chunked(limit), DataItem.PRACTITIONER_ROLES) {
+              postData(config.getString("opensrp.rest.practitioner.role.url"), it, DataItem.PRACTITIONER_ROLES)
+            }
+          }
+
+          DataItem.PRACTITIONER_ROLES -> {
+            logger.warn("DONE: OpenSRP Data Import completed...sending request to shutdown)")
+            vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
+          }
         }
       }
     } catch (throwable: Throwable) {
       vertx.exceptionHandler().handle(throwable)
     }
   }
+
+  private fun generatePractitioners() =
+    keycloakUsers.filter { it.username != null && userIdsMap.containsKey(it.username) }.map {
+      Practitioner(
+        identifier = it.practitionerId,
+        name = "${it.firstName}  ${it.lastName}",
+        userId = userIdsMap[it.username]!!,
+        username = it.username!!
+      )
+    }.onEach { convertToCSV(DataItem.PRACTITIONERS, it) }
+
+  private fun generatePractitionerRoles() =
+    keycloakUsers.filter { it.username != null && userIdsMap.containsKey(it.username) && it.orgLocId != null }
+      .map {
+        PractitionerRole(
+          identifier = UUID.randomUUID().toString(),
+          organization = it.orgLocId!!,
+          practitioner = it.practitionerId
+        )
+      }.onEach { convertToCSV(DataItem.PRACTITIONER_ROLES, it) }
 
   private suspend fun postLocations(locations: JsonArray) {
     locations.forEach { location ->
@@ -201,7 +239,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
         locations.filter { it.hasTeam }.associateBy { it.id }.map { it.value }.forEach {
           if (generateTeams.isNotBlank()) {
-            createOrganizations(it)
+            generateOrganizations(it)
           }
         }
         val newLocations = locations.filter { it.isNew }.associateBy { it.id }.map { it.value }.chunked(limit)
@@ -312,29 +350,29 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       })
   }
 
-  private fun createOrganizations(location: Location) {
+  private fun generateOrganizations(location: Location) {
     with(location) {
       try {
         val organizationId = UUID.randomUUID().toString()
 
         val organization = Organization(identifier = organizationId, name = "Team ${properties.name}")
         organizations.add(organization)
-
-        vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
-          put(ACTION, DataItem.ORGANIZATIONS.name.lowercase())
-          put(PAYLOAD, JsonObject(jsonEncoder().encodeToString(organization)))
-        })
+        convertToCSV(DataItem.ORGANIZATIONS, organization)
 
         val organizationLocation = OrganizationLocation(organizationId, id)
         organizationLocations.add(organizationLocation)
-        vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
-          put(ACTION, DataItem.ORGANIZATION_LOCATIONS.name.lowercase())
-          put(PAYLOAD, JsonObject(jsonEncoder().encodeToString(organizationLocation)))
-        })
+        convertToCSV(DataItem.ORGANIZATION_LOCATIONS, organizationLocation)
 
       } catch (throwable: Throwable) {
         vertx.exceptionHandler().handle(throwable)
       }
     }
+  }
+
+  private inline fun <reified T> convertToCSV(dataItem: DataItem, model: T) {
+    vertx.eventBus().send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
+      put(ACTION, dataItem.name.lowercase())
+      put(PAYLOAD, JsonObject(jsonEncoder().encodeToString(model)))
+    })
   }
 }

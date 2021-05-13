@@ -5,7 +5,6 @@ import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.core.deploymentOptionsOf
 import org.smartregister.dataimport.main.MainVerticle
 import org.smartregister.dataimport.shared.*
-import org.smartregister.dataimport.shared.SKIP_LOCATION_TAGS
 
 /**
  * Main function for debugging the application in the IDE

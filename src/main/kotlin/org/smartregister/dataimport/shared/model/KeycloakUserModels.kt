@@ -39,7 +39,7 @@ class KeycloakUser {
   val enabled: Boolean = true
 
   @Transient
-  var organizationLocationId: String? = null
+  var orgLocId: String? = null
 
   @Transient
   var practitionerId: String = UUID.randomUUID().toString()

@@ -8,7 +8,7 @@ data class PractitionerRole(
   val active: Boolean = true,
   val organization: String,
   val practitioner: String,
-  val code: PractitionerCode
+  val code: PractitionerCode = PractitionerCode()
 )
 
 @Serializable

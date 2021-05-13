@@ -285,10 +285,10 @@ abstract class BaseVerticle : CoroutineVerticle() {
   }
 
   protected suspend fun checkTaskCompletion(counter: Counter, dataItem: DataItem) {
-      val currentCount = counter.decrementAndGet().await()
-      if (currentCount == 0L) {
-        completeTask(dataItem = dataItem)
-      }
+    val currentCount = counter.decrementAndGet().await()
+    if (currentCount == 0L) {
+      completeTask(dataItem = dataItem)
+    }
   }
 
   companion object {
