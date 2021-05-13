@@ -4,7 +4,6 @@ import com.opencsv.CSVWriter
 import com.opencsv.bean.ColumnPositionMappingStrategy
 import com.opencsv.bean.CsvToBeanBuilder
 import com.opencsv.bean.StatefulBeanToCsvBuilder
-import io.vertx.circuitbreaker.CircuitBreaker
 import io.vertx.config.ConfigRetriever
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.config.ConfigStoreOptions
@@ -37,8 +36,7 @@ import java.nio.file.FileSystems
 
 /**
  * This is the base class extending [CoroutineVerticle] for all the Verticles. It provides the [webClient] used to perform
- * web requests. Also has [circuitBreaker] for wrapping web requests. [CircuitBreaker] is an implementation of
- * circuit breaker pattern.
+ * web requests.
  *
  * The [limit] and [requestInterval] are config defaults used to limit the number of records that can be sent per each
  * request and the time period between each server request respectively.
@@ -66,7 +64,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
   override suspend fun start() {
     vertx.exceptionHandler { throwable ->
       logger.error("$concreteClassName::Vertx exception", throwable)
-      vertx.close()
+      vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
     }
 
     try {
@@ -244,7 +242,6 @@ abstract class BaseVerticle : CoroutineVerticle() {
   protected fun <T> consumeCSVData(csvData: List<List<T>>, dataItem: DataItem, action: suspend (List<T>) -> Unit) {
     if (csvData.isEmpty()) {
       logger.info("TASK IGNORED: NO ${dataItem.name.lowercase()} data to migrate to OpenSRP")
-      logger.warn("SHUTDOWN: Stopping gracefully...(Press Ctrl + C) to force")
       vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
       return
     }

@@ -27,6 +27,7 @@ class MainVerticle : BaseVerticle() {
     //Listen to shutdown request
     vertx.eventBus().consumer<Boolean>(EventBusAddress.APP_SHUTDOWN).handler { message ->
       if (message.body()) {
+        logger.warn("SHUTDOWN: Stopping gracefully...(Press Ctrl + C) to force")
         vertx.close()
       }
     }
@@ -51,7 +52,6 @@ class MainVerticle : BaseVerticle() {
                 vertx.close()
               }
             }
-
           } else {
             logger.error("Nothing to deploy")
           }

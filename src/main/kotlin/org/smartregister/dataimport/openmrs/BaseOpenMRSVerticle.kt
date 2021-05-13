@@ -23,19 +23,24 @@ abstract class BaseOpenMRSVerticle : BaseVerticle() {
 
   override suspend fun start() {
     super.start()
-    val connectionOptions = MySQLConnectOptions()
-      .setHost(config.getString("openmrs.mysql.host"))
-      .setPort(config.getInteger("openmrs.mysql.port"))
-      .setUser(config.getString("openmrs.mysql.user"))
-      .setPassword(config.getString("openmrs.mysql.password"))
-      .setDatabase(config.getString("openmrs.mysql.database"))
-      .setReconnectAttempts(3)
-      .setReconnectInterval(2000)
-      .setTracingPolicy(TracingPolicy.PROPAGATE)
+    try {
+      val connectionOptions = MySQLConnectOptions()
+        .setHost(config.getString("openmrs.mysql.host"))
+        .setPort(config.getInteger("openmrs.mysql.port"))
+        .setUser(config.getString("openmrs.mysql.user"))
+        .setPassword(config.getString("openmrs.mysql.password"))
+        .setDatabase(config.getString("openmrs.mysql.database"))
+        .setReconnectAttempts(3)
+        .setReconnectInterval(2000)
+        .setTracingPolicy(TracingPolicy.PROPAGATE)
 
-    val poolOptions = PoolOptions().setMaxSize(10).setMaxWaitQueueSize(5)
+      val poolOptions = PoolOptions().setMaxSize(10).setMaxWaitQueueSize(5)
 
-    pool = MySQLPool.pool(vertx, connectionOptions, poolOptions)
+      pool = MySQLPool.pool(vertx, connectionOptions, poolOptions)
+    } catch (sqlException: SQLException) {
+      vertx.exceptionHandler().handle(sqlException)
+    }
+
 
     limit = config.getInteger("data.limit", 50)
   }
