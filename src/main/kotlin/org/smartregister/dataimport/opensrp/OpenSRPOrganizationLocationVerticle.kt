@@ -1,6 +1,9 @@
 package org.smartregister.dataimport.opensrp
 
+import io.vertx.core.buffer.Buffer
 import io.vertx.core.json.JsonArray
+import io.vertx.ext.web.client.HttpResponse
+import io.vertx.kotlin.coroutines.awaitResult
 import org.smartregister.dataimport.openmrs.OpenMRSTeamLocationVerticle
 import org.smartregister.dataimport.shared.EventBusAddress
 import org.smartregister.dataimport.shared.SOURCE_FILE
@@ -12,7 +15,7 @@ class OpenSRPOrganizationLocationVerticle : BaseOpenSRPVerticle() {
 
   override suspend fun start() {
     super.start()
-    if (config.getString(SOURCE_FILE, "").isBlank()) {
+    if (config.getString(SOURCE_FILE, "").isNullOrBlank()) {
       vertx.deployVerticle(OpenMRSTeamLocationVerticle())
       consumeOpenMRSData(
         countAddress = EventBusAddress.OPENMRS_TEAM_LOCATIONS_COUNT,
@@ -23,8 +26,10 @@ class OpenSRPOrganizationLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private suspend fun mapTeamWithLocation(teamLocations: JsonArray) {
-    webRequest(
-      url = config.getString("opensrp.rest.organization.location.url"), payload = teamLocations
-    )?.logHttpResponse()
+    awaitResult<HttpResponse<Buffer>?> {
+      webRequest(
+        url = config.getString("opensrp.rest.organization.location.url"), payload = teamLocations, handler = it
+      )
+    }?.logHttpResponse()
   }
 }

@@ -45,13 +45,13 @@ class Application : CliktCommand(name = "opensrp-data-import") {
 
         1. locations - Use to import location tags and locations
 
-        2. organization - Use to import teams
+        2. organizations - Use to import teams
 
         3. organization_locations - Use to assign teams to locations
 
         4. keycloak_users - Use to create and assign Keycloak users to Provider group
 
-        5. practitioner - Use to import practitioners
+        5. practitioners - Use to import practitioners
 
         6. practitioner_roles = Use assign practitioners to teams
 

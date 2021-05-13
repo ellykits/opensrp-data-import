@@ -1,6 +1,9 @@
 package org.smartregister.dataimport.opensrp
 
+import io.vertx.core.buffer.Buffer
 import io.vertx.core.json.JsonArray
+import io.vertx.ext.web.client.HttpResponse
+import io.vertx.kotlin.coroutines.awaitResult
 import org.smartregister.dataimport.openmrs.OpenMRSUserRoleVerticle
 import org.smartregister.dataimport.shared.EventBusAddress
 
@@ -20,7 +23,8 @@ class OpenSRPPractitionerRoleVerticle : BaseOpenSRPVerticle() {
   }
 
   private suspend fun postUserRoles(teams: JsonArray) {
-    webRequest(url = config.getString("opensrp.rest.practitioner.role.url"), payload = teams)
-      ?.logHttpResponse()
+    awaitResult<HttpResponse<Buffer>?> {
+      webRequest(url = config.getString("opensrp.rest.practitioner.role.url"), payload = teams, handler = it)
+    }?.logHttpResponse()
   }
 }

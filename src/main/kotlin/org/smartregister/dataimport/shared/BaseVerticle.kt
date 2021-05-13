@@ -5,10 +5,11 @@ import com.opencsv.bean.ColumnPositionMappingStrategy
 import com.opencsv.bean.CsvToBeanBuilder
 import com.opencsv.bean.StatefulBeanToCsvBuilder
 import io.vertx.circuitbreaker.CircuitBreaker
-import io.vertx.circuitbreaker.CircuitBreakerOptions
 import io.vertx.config.ConfigRetriever
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.config.ConfigStoreOptions
+import io.vertx.core.AsyncResult
+import io.vertx.core.Handler
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonArray
@@ -21,7 +22,8 @@ import io.vertx.ext.web.multipart.MultipartForm
 import io.vertx.kotlin.core.deploymentOptionsOf
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.kotlin.coroutines.await
-import kotlinx.coroutines.Dispatchers
+import io.vertx.kotlin.coroutines.awaitEvent
+import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -45,11 +47,9 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   private lateinit var webClient: WebClient
 
-  private lateinit var circuitBreaker: CircuitBreaker
-
   protected lateinit var dataDirectoryPath: String
 
-  protected val deployedVerticlesMap = mutableMapOf<String, String>()
+  protected val deployedVerticleIds = mutableSetOf<String>()
 
   protected val logger: Logger = LoggerFactory.getLogger(this::class.java)
 
@@ -60,6 +60,8 @@ abstract class BaseVerticle : CoroutineVerticle() {
   protected val concreteClassName: String = this::class.java.simpleName
 
   protected fun jsonEncoder() = Json { encodeDefaults = true }
+
+  private var workerPoolSize: Int = 10
 
   override suspend fun start() {
     vertx.exceptionHandler { throwable ->
@@ -73,24 +75,14 @@ abstract class BaseVerticle : CoroutineVerticle() {
         ConfigStoreOptions()
           .setType("file")
           .setFormat("properties")
-          .setConfig(
-            JsonObject().put(
-              "path", filePath
-            )
-          )
+          .setConfig(JsonObject().put("path", filePath))
       )
       val appConfigs = ConfigRetriever.create(vertx, options).config.await()
       config.mergeIn(appConfigs)
 
-      circuitBreaker = CircuitBreaker.create(
-        CIRCUIT_BREAKER_NAME, vertx, CircuitBreakerOptions().setMaxFailures(5)
-          .setTimeout(config.getLong("request.timeout", 10000))
-          .setFallbackOnFailure(true)
-          .setResetTimeout(config.getLong("reset.timeout", 10000))
-      )
-
       webClient = WebClient.wrap(vertx.createHttpClient())
 
+      workerPoolSize = config.getInteger("worker.pool.size", 10)
       limit = config.getInteger("data.limit", 50)
       requestInterval = config.getLong("request.interval")
 
@@ -112,40 +104,51 @@ abstract class BaseVerticle : CoroutineVerticle() {
   }
 
   protected suspend fun deployVerticle(verticle: BaseVerticle, configs: JsonObject = JsonObject()) {
-    val deploymentID = vertx.deployVerticle(verticle, deploymentOptionsOf(config = configs)).await()
-    deployedVerticlesMap[verticle::class.java.simpleName] = deploymentID
+    try {
+      val deploymentId = vertx.deployVerticle(
+        verticle, deploymentOptionsOf(
+          worker = true,
+          workerPoolSize = workerPoolSize,
+          workerPoolName = configs.getString(IMPORT_OPTION, "opensrp-data-import"),
+          config = configs
+        )
+      ).await()
+      deployedVerticleIds.add(deploymentId)
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
+    }
   }
 
   private fun User.getAccessToken() = this.principal().getString(ACCESS_TOKEN)!!
 
-  protected suspend fun webRequest(
-    method: HttpMethod = HttpMethod.POST, url: String, payload: Any? = null, queryParams: Map<String, String> = mapOf()
-  ): HttpResponse<Buffer>? {
+  protected fun webRequest(
+    method: HttpMethod = HttpMethod.POST, url: String, payload: Any? = null, queryParams: Map<String, String> = mapOf(),
+    handler: Handler<AsyncResult<HttpResponse<Buffer>?>>
+  ) {
 
-    if (user == null && user!!.expired()) {
-      return null
+    if (user == null || (user != null && user!!.expired())) {
+      return
     }
 
-    val httpRequest = httpRequest(method, url)
-      .putHeader("Accept", "application/json")
-      .putHeader("Content-Type", "application/json")
-      .followRedirects(true)
-      .bearerTokenAuthentication(user!!.getAccessToken())
-      .timeout(config.getLong("request.timeout"))
+    try {
+      val httpRequest = httpRequest(method, url)
+        .putHeader("Accept", "application/json")
+        .putHeader("Content-Type", "application/json")
+        .followRedirects(true)
+        .bearerTokenAuthentication(user!!.getAccessToken())
+        .timeout(config.getLong("request.timeout"))
 
-    if (queryParams.isNotEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
+      if (queryParams.isNotEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
 
-    return circuitBreaker.execute<HttpResponse<Buffer>?> {
-      launch(Dispatchers.IO) {
-        when (payload) {
-          is JsonArray -> it.complete(httpRequest.sendBuffer(payload.toBuffer()).await())
-          is JsonObject -> it.complete(httpRequest.sendBuffer(payload.toBuffer()).await())
-          is MultipartForm -> it.complete(httpRequest.sendMultipartForm(payload).await())
-          null -> it.complete(httpRequest.send().await())
-          else -> it.complete(null)
-        }
+      when (payload) {
+        is JsonArray -> httpRequest.sendBuffer(payload.toBuffer(), handler)
+        is JsonObject -> httpRequest.sendBuffer(payload.toBuffer(), handler)
+        is MultipartForm -> httpRequest.sendMultipartForm(payload, handler)
+        null -> httpRequest.send(handler)
       }
-    }.await()
+    } catch (throwable: Throwable) {
+      return
+    }
   }
 
   protected fun HttpResponse<Buffer>.logHttpResponse() {
@@ -178,11 +181,13 @@ abstract class BaseVerticle : CoroutineVerticle() {
     logger.info("Stopping verticle:  $concreteClassName")
   }
 
-  protected fun getVerticleCommonConfigs() =
+  protected fun commonConfigs() =
     JsonObject().apply {
+      put(IMPORT_OPTION, config.getString(IMPORT_OPTION))
       put(SOURCE_FILE, config.getString(SOURCE_FILE, ""))
       put(USERS_FILE, config.getString(USERS_FILE, ""))
       put(SKIP_LOCATION_TAGS, config.getBoolean(SKIP_LOCATION_TAGS, false))
+      put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, ""))
     }
 
   protected inline fun <reified T> writeCsv(fileName: String, payload: String) {
@@ -207,7 +212,9 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
-  protected inline fun <reified T> readCsvData(fileName: String, fromAnyPlace: Boolean = false, skipLines: Int = 0): List<T> {
+  protected inline fun <reified T> readCsvData(
+    fileName: String, fromAnyPlace: Boolean = false, skipLines: Int = 0
+  ): List<T> {
     val fullPath = if (fromAnyPlace) fileName else "$dataDirectoryPath$fileName.csv"
 
     val reader = FileReader(fullPath)
@@ -232,6 +239,37 @@ abstract class BaseVerticle : CoroutineVerticle() {
       reader.close()
     }
     return csvData
+  }
+
+  protected fun <T> consumeCSVData(csvData: List<List<T>>, dataItem: DataItem, action: suspend (List<T>) -> Unit) {
+    if (csvData.isEmpty()) {
+      logger.info("TASK IGNORED: NO ${dataItem.name.lowercase()} data to migrate to OpenSRP.")
+      return
+    }
+    try {
+      launch(vertx.dispatcher()) {
+        for ((index, _) in csvData.withIndex()) {
+          awaitEvent<Long> { vertx.setTimer(requestInterval, it) }
+          action(csvData[index])
+        }
+        completeTask(dataItem = dataItem)
+      }
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
+    }
+  }
+
+  protected fun completeTask(dataLoadAddress: String = "data", dataItem: DataItem? = null, timerId: Long? = null) {
+    val data = when (dataLoadAddress) {
+      EventBusAddress.OPENMRS_USERS_LOAD -> "users"
+      EventBusAddress.OPENMRS_TEAM_LOCATIONS_LOAD -> "team locations mapping"
+      EventBusAddress.OPENMRS_TEAMS_LOAD -> "teams"
+      EventBusAddress.OPENMRS_LOCATIONS_LOAD -> "locations"
+      else -> "data"
+    }
+    logger.info("TASK COMPLETED: ${dataItem?.name?.lowercase() ?: data} data migrated.")
+    if (dataItem != null) vertx.eventBus().send(EventBusAddress.TASK_COMPLETE, dataItem.name)
+    if (timerId != null) vertx.cancelTimer(timerId)
   }
 
   companion object {

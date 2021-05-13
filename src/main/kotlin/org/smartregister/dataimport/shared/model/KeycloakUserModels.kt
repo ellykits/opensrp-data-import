@@ -9,6 +9,9 @@ import java.util.*
 class KeycloakUser {
 
   @Transient
+  var userId: String? = null
+
+  @Transient
   @CsvBindByPosition(position = 0)
   var parentLocation: String? = null
 
@@ -36,7 +39,7 @@ class KeycloakUser {
   val enabled: Boolean = true
 
   @Transient
-  var teamLocationId: String? = null
+  var organizationLocationId: String? = null
 
   @Transient
   var practitionerId: String = UUID.randomUUID().toString()

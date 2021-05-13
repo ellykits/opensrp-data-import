@@ -24,7 +24,7 @@ class CsvGeneratorVerticle : BaseVerticle() {
     try {
       vertx.eventBus().consumer<JsonObject>(EventBusAddress.CSV_GENERATE) { message ->
         vertx.executeBlocking<Unit> {
-          val fileName = message.body().getString(FILE_NAME)
+          val fileName = message.body().getString(ACTION)
           val payload = message.body().getString(PAYLOAD)
 
           createNonExistentFile(fileName)

@@ -1,10 +1,12 @@
 package org.smartregister.dataimport.opensrp
 
+import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
+import io.vertx.ext.web.client.HttpResponse
+import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.smartregister.dataimport.openmrs.OpenMRSUserVerticle
 import org.smartregister.dataimport.shared.*
@@ -22,7 +24,13 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
 
     val baseUrl = config.getString("keycloak.rest.users.url")
     val queryParameters = mutableMapOf(FIRST to "0", MAX to limit.toString())
-    val countResponse = webRequest(method = HttpMethod.GET, url = config.getString("keycloak.rest.users.count.url"))
+    val countResponse = awaitResult<HttpResponse<Buffer>?> {
+      webRequest(
+        method = HttpMethod.GET,
+        url = config.getString("keycloak.rest.users.count.url"),
+        handler = it
+      )
+    }
 
     if (countResponse != null) {
       val userCount = countResponse.bodyAsString().toLong()
@@ -34,7 +42,14 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
         }
         launch(vertx.dispatcher()) {
           logger.info("Current offset: ${queryParameters[FIRST]} and limit: $limit")
-          val usersResponse = webRequest(method = HttpMethod.GET, queryParams = queryParameters, url = baseUrl)
+          val usersResponse = awaitResult<HttpResponse<Buffer>?> {
+            webRequest(
+              method = HttpMethod.GET,
+              queryParams = queryParameters,
+              url = baseUrl,
+              handler = it
+            )
+          }
           usersResponse?.bodyAsJsonArray()?.map { it as JsonObject }?.forEach {
             userIdsMap[it.getString(USERNAME)] = it.getString(ID)
           }
@@ -48,22 +63,25 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
       loadAddress = EventBusAddress.OPENMRS_USERS_LOAD,
       action = this::createPractitioners
     )
+
+    //Watch for any updates on user id
+    updateUserIds(userIdsMap)
   }
 
   private suspend fun createPractitioners(practitioners: JsonArray) {
-    launch(Dispatchers.IO) {
-      val practitionerList: JsonArray = practitioners.onEach {
-        if (it is JsonObject) {
-          it.put(USER_ID, userIdsMap[it.getString(USERNAME)])
-          it.put(ACTIVE, it.remove(ENABLED))
-          it.remove(CREDENTIALS)
-          it.remove(FIRST_NAME)
-          it.remove(LAST_NAME)
-        }
+    val practitionerList: JsonArray = practitioners.onEach {
+      if (it is JsonObject) {
+        it.put(USER_ID, userIdsMap[it.getString(USERNAME)])
+        it.put(ACTIVE, it.remove(ENABLED))
+        it.remove(CREDENTIALS)
+        it.remove(FIRST_NAME)
+        it.remove(LAST_NAME)
       }
-      webRequest(url = config.getString("opensrp.rest.practitioner.url"), payload = practitionerList)
-        ?.logHttpResponse()
     }
+    awaitResult<HttpResponse<Buffer>?> {
+      webRequest(url = config.getString("opensrp.rest.practitioner.url"), payload = practitionerList, handler = it)
+    }?.logHttpResponse()
+
   }
 
 }
