@@ -101,7 +101,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           }
           DataItem.ORGANIZATION_LOCATIONS -> {
             keycloakUsers = organizationUsers.map { it.value }.flatten().onEach {
-              it.organizationLocation = locationIdsMap[it.parentLocation + it.location]
+              it.organizationLocation = locationIdsMap["${it.parentLocation}|${it.location}"] //name separated with '|' sign
             }
             logger.info("Posting ${keycloakUsers.size} users to Keycloak")
             val keycloakUsersChunked = keycloakUsers.chunked(limit)
@@ -234,6 +234,10 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
             while (cells != null) {
               if (counter > 1) {
                 val processedLocations = processLocations(headers, cells, geoLevels)
+                processedLocations.forEach {
+                  val csvLocation = CSVLocation(it.parentId, it.uniqueName, it.id, it.exactName, it.firstLocationTag)
+                  convertToCSV(DataItem.LOCATIONS, csvLocation)
+                }
                 allLocations.addAll(processedLocations)
               }
               cells = csvReader.readNext()
@@ -359,9 +363,15 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         isNew = isNewLocation,
         assignTeam = assignTeam,
         uniqueName = key,
-        uniqueParentName = parentKey
-      )
+        uniqueParentName = parentKey,
+        firstLocationTag = locationTag
+      ).apply {
+        this.exactName = locationProperties.name
+        this.parentId = locationProperties.parentId  //Flattened for csv
+      }
+
       locations.add(location)
+
     }
     return locations
   }
@@ -386,18 +396,19 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private fun getUniqueName(cellRanges: List<CellRange>) = cellRanges.filter { !it.header.endsWith(ID, true) }
-    .joinToString(separator = "") { it.value }.trim()
+    .joinToString(separator = "|") { it.value }.trim()
 
   private fun generateOrganizations(location: Location) {
     with(location) {
       try {
+
         val organizationId = UUID.randomUUID().toString()
 
-        val organization = Organization(identifier = organizationId, name = "Team ${properties.name}")
+        val organization = Organization(identifier = organizationId, name = "Team ${properties!!.name}")
         organizations.add(organization)
         convertToCSV(DataItem.ORGANIZATIONS, organization)
 
-        val organizationLocation = OrganizationLocation(organizationId, id)
+        val organizationLocation = OrganizationLocation(organizationId, id!!)
         organizationLocations.add(organizationLocation)
         convertToCSV(DataItem.ORGANIZATION_LOCATIONS, organizationLocation)
 
