@@ -140,6 +140,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       if (queryParams.isNotEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
 
       when (payload) {
+        is String -> httpRequest.sendBuffer(Buffer.buffer(payload), handler)
         is JsonArray -> httpRequest.sendBuffer(payload.toBuffer(), handler)
         is JsonObject -> httpRequest.sendBuffer(payload.toBuffer(), handler)
         is MultipartForm -> httpRequest.sendMultipartForm(payload, handler)

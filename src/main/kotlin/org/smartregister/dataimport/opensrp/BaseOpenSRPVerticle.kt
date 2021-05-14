@@ -52,12 +52,13 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
    * When 0 it means that was the last request.
    */
   protected suspend inline fun <reified T> postData(url: String, data: List<T>, dataItem: DataItem) {
-    val item = dataItem.name.lowercase()
-    logger.info("Posting ${data.size} $item data to OpenSRP")
-    val payload = JsonArray(jsonEncoder().encodeToString(data))
-    val counter = vertx.sharedData().getCounter(dataItem.name).await()
     try {
-      awaitResult<HttpResponse<Buffer>?> { webRequest(url = url, payload = payload, handler = it) }
+      val item = dataItem.name.lowercase()
+      logger.info("Posting ${data.size} $item data to OpenSRP")
+      val json: String = jsonEncoder().encodeToString(data)
+      val counter = vertx.sharedData().getCounter(dataItem.name).await()
+
+      awaitResult<HttpResponse<Buffer>?> { webRequest(url = url, payload = json, handler = it) }
         ?.run {
           logHttpResponse()
           logger.info("Posted ${data.size} $item to OpenSRP")

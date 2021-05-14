@@ -6,6 +6,7 @@ import kotlinx.coroutines.launch
 import org.smartregister.dataimport.csv.CsvGeneratorVerticle
 import org.smartregister.dataimport.keycloak.KeycloakUserVerticle
 import org.smartregister.dataimport.opensrp.*
+import org.smartregister.dataimport.opensrp.location.OpenSRPLocationTagVerticle
 import org.smartregister.dataimport.shared.BaseVerticle
 import org.smartregister.dataimport.shared.DataItem
 import org.smartregister.dataimport.shared.EventBusAddress

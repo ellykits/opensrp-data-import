@@ -1,4 +1,4 @@
-package org.smartregister.dataimport.opensrp
+package org.smartregister.dataimport.opensrp.location
 
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpMethod
@@ -8,6 +8,7 @@ import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
+import org.smartregister.dataimport.opensrp.BaseOpenSRPVerticle
 import org.smartregister.dataimport.shared.*
 
 /**

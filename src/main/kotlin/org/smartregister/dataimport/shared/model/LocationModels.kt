@@ -6,15 +6,24 @@ import kotlinx.serialization.Transient
 @Serializable
 data class Location(
   val id: String,
+
   val type: String = "Feature",
+
   val properties: LocationProperties,
+
   val locationTags: List<LocationTag>? = null,
+
   @Transient
   var isNew: Boolean = false,
+
   @Transient
-  var hasTeam: Boolean = false,
+  var assignTeam: Boolean = false,
+
   @Transient
-  var uniqueName: String? = null
+  var uniqueName: String? = null,
+
+  @Transient
+  var uniqueParentName: String? = null
 )
 
 @Serializable
@@ -22,7 +31,7 @@ data class LocationProperties(
   val status: String = "Active",
   var parentId: String = "",
   val name: String,
-  val geoGraphicLevel: Int = 0,
+  val geographicLevel: Int,
   val version: Int = 0
 )
 
