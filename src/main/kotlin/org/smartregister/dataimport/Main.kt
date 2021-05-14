@@ -24,20 +24,30 @@ class Application : CliktCommand(name = "opensrp-data-import") {
   )
 
   private val sourceFile: String? by option(
-    help = "Source file (MUST be in CSV format)", envvar = "OPENSRP_DATA_IMPORT_SOURCE_FILE",
+    help = "CSV file with the locations data", envvar = "OPENSRP_DATA_IMPORT_SOURCE_FILE",
     names = arrayOf("--source-file", "-s")
   )
 
   private val generateTeams: String? by option(
-    help = "Indicate the Location Level to Assign teams", names = arrayOf("--generate-teams-at", "-gTA")
+    help = "Indicate the location level for team assignment", names = arrayOf("--assign-team", "-aT")
   )
 
   private val usersFile: String? by option(
     help = "File containing users details. This is used to export to ",
-    names = arrayOf("--users-file", "-uF")
+    names = arrayOf("--users-file", "-u")
   )
 
-  private val skipLocationTags: Boolean by option("--skip-location-tags", "-sLT").flag(default = false)
+  private val skipLocationTags: Boolean by option(
+    help = "Skip importing location tags", names = arrayOf("--skip-location-tags", "-sT")
+  ).flag(default = false)
+
+  private val skipLocations: Boolean by option(
+    help = "Skip importing locations", names = arrayOf("--skip-locations", "-sL")
+  ).flag(default = false)
+
+  private val skipUserGroup: Boolean by option(
+    help = "Skip importing locations", names = arrayOf("--skip-user-group", "-sG")
+  ).flag(default = false)
 
   private val importOption: String? by option(
     help = """
@@ -79,6 +89,8 @@ class Application : CliktCommand(name = "opensrp-data-import") {
         put(SOURCE_FILE, sourceFile)
         put(USERS_FILE, usersFile)
         put(SKIP_LOCATION_TAGS, skipLocationTags)
+        put(SKIP_LOCATIONS, skipLocations)
+        put(SKIP_USER_GROUP, skipUserGroup)
         put(GENERATE_TEAMS, generateTeams)
       }
 

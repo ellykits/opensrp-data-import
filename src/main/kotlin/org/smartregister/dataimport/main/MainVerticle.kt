@@ -37,9 +37,10 @@ class MainVerticle : BaseVerticle() {
         if (message.body()) {
           val choice = config.getString(IMPORT_OPTION)
 
+          deployVerticle(CsvGeneratorVerticle())
+
           val verticleConfigs = commonConfigs()
-          val csvGeneratorVerticleId = vertx.deployVerticle(CsvGeneratorVerticle()).await()
-          if (choice != null && csvGeneratorVerticleId != null) {
+          if (choice != null) {
             when (DataItem.valueOf(choice.uppercase())) {
               DataItem.LOCATIONS -> deployVerticle(OpenSRPLocationTagVerticle(), verticleConfigs)
               DataItem.ORGANIZATIONS -> deployVerticle(OpenSRPOrganizationVerticle(), verticleConfigs)

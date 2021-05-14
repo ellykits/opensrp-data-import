@@ -4,13 +4,11 @@ import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpResponse
+import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
-import org.smartregister.dataimport.shared.ACTIVE
-import org.smartregister.dataimport.shared.DESCRIPTION
-import org.smartregister.dataimport.shared.NAME
-import org.smartregister.dataimport.shared.SKIP_LOCATION_TAGS
+import org.smartregister.dataimport.shared.*
 
 /**
  * Subclass of [BaseOpenSRPVerticle] responsible for posting OpenSRP location tags and for deploying [OpenSRPLocationVerticle]
@@ -19,11 +17,21 @@ import org.smartregister.dataimport.shared.SKIP_LOCATION_TAGS
 class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
   override suspend fun start() {
     super.start()
+
+    vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler { message ->
+      if(DataItem.valueOf(message.body()) == DataItem.LOCATION_TAGS){
+        vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
+      }
+    }
+
+    val skipLocations = config.getBoolean(SKIP_LOCATIONS)
+    val counter =  vertx.sharedData().getCounter(DataItem.LOCATION_TAGS.name).await()
     launch(vertx.dispatcher()) {
       if (!config.getBoolean(SKIP_LOCATION_TAGS)) {
         config.getString("location.hierarchy")
           .split(',')
           .map { it.split(":").first().trim() }
+          .also { counter.getAndAdd(it.size.toLong()).await() }
           .forEach {
 
             val locationTag = JsonObject()
@@ -39,11 +47,14 @@ class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
                 handler = handler
               )
 
-            }?.logHttpResponse()
-
+            }?.run {
+              logHttpResponse()
+              if(skipLocations) checkTaskCompletion(counter, DataItem.LOCATION_TAGS)
+            }
           }
       }
-      deployVerticle(OpenSRPLocationVerticle(), commonConfigs())
+
+      if (!skipLocations) deployVerticle(OpenSRPLocationVerticle(), commonConfigs())
     }
   }
 }

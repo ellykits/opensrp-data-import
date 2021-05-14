@@ -44,6 +44,8 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   private val userIdsMap = TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
 
+  private var locationOrganizationMap = mapOf<String,OrganizationLocation>()
+
   override suspend fun start() {
     super.start()
 
@@ -67,8 +69,10 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
         extractLocationsFromCSV(sourceFile)
 
+        //Begin by posting locations from CSV, then organization, map organizations to locations, post keycloak users,
+        // create practitioners and finally assign practitioners to organizations
         cascadeDataImportation()
-        //Update Map with keycloak user ids
+
         updateUserIds(userIdsMap)
       } catch (throwable: Throwable) {
         vertx.exceptionHandler().handle(throwable)
@@ -76,10 +80,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     }
   }
 
-
   private fun cascadeDataImportation() {
-    //Begin by posting locations from CSV, then organization, map organizations to locations, post keycloak users,
-    // create practitioners and finally assign practitioners to organizations
     try {
       vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler { message ->
         when (DataItem.valueOf(message.body())) {
@@ -99,7 +100,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           }
           DataItem.ORGANIZATION_LOCATIONS -> {
             keycloakUsers = organizationUsers.map { it.value }.flatten().onEach {
-              it.orgLocId = locationIds[it.parentLocation + it.location]
+              it.organizationLocation = locationIds[it.parentLocation + it.location]
             }
             logger.info("Posting ${keycloakUsers.size} users to Keycloak")
             val keycloakUsersChunked = keycloakUsers.chunked(limit)
@@ -110,6 +111,12 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           DataItem.KEYCLOAK_USERS -> {
             val usernames = keycloakUsers.filter { it.username != null }.map { it.username!! }
             logger.info("Assigning ${usernames.size} users to 'Provider' group")
+
+            //Skip assigning users to provider group
+            if(config.getBoolean(SKIP_USER_GROUP, false)){
+              completeTask(dataItem = DataItem.KEYCLOAK_USERS_GROUPS)
+            }
+
             val usernamesChunked = usernames.chunked(limit)
             consumeCSVData(usernamesChunked, DataItem.KEYCLOAK_USERS_GROUPS) {
               sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN, DataItem.KEYCLOAK_USERS_GROUPS, it)
@@ -127,11 +134,11 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
               postData(config.getString("opensrp.rest.practitioner.role.url"), it, DataItem.PRACTITIONER_ROLES)
             }
           }
-
           DataItem.PRACTITIONER_ROLES -> {
             logger.warn("DONE: OpenSRP Data Import completed...sending request to shutdown)")
             vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
           }
+          else -> vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
         }
       }
     } catch (throwable: Throwable) {
@@ -143,18 +150,18 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     keycloakUsers.filter { it.username != null && userIdsMap.containsKey(it.username) }.map {
       Practitioner(
         identifier = it.practitionerId,
-        name = "${it.firstName}  ${it.lastName}",
+        name = "${it.firstName} ${it.lastName}",
         userId = userIdsMap[it.username]!!,
-        username = it.username!!
+        username = it.username!!.lowercase()
       )
     }.onEach { convertToCSV(DataItem.PRACTITIONERS, it) }
 
   private fun generatePractitionerRoles() =
-    keycloakUsers.filter { it.username != null && userIdsMap.containsKey(it.username) && it.orgLocId != null }
+    keycloakUsers.filter { it.username != null && userIdsMap.containsKey(it.username) && it.organizationLocation != null }
       .map {
         PractitionerRole(
           identifier = UUID.randomUUID().toString(),
-          organization = it.orgLocId!!,
+          organization = locationOrganizationMap.getValue(it.organizationLocation!!).organization!!,
           practitioner = it.practitionerId
         )
       }.onEach { convertToCSV(DataItem.PRACTITIONER_ROLES, it) }
@@ -242,6 +249,9 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
             generateOrganizations(it)
           }
         }
+        //Associate location to organization for future assignment of practitioner to an organization(team)
+        locationOrganizationMap = organizationLocations.filter { it.jurisdiction != null }.associateBy{ it.jurisdiction!! }
+
         val newLocations = locations.filter { it.isNew }.associateBy { it.id }.map { it.value }.chunked(limit)
         promise.complete(newLocations)
       }.await()
@@ -257,7 +267,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     //Columns must be at least 4 and even number
     val isSizeValid = headers.size % 2 == 0 && headers.size >= 4
     if (!isSizeValid) {
-      logError(promise, "Error: CSV format not valid - expected an even number of at least 4 columns")
+      logError(promise, "INVALID_COLUMNS: expected at least 4 even number of columns")
       return false
     }
 
@@ -265,16 +275,18 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     headers.toList().chunked(2).onEach {
       val (levelId, level) = it
 
-      if (!locationTagsMap.containsKey(level)) {
-        logError(promise, "Error: Location tag $level does not exist. Import location tags and continue.")
+      if (!locationTagsMap.containsKey(level) && !level.equals(CONTINENT, true)) {
+        logger.warn("Location level MUST be below ROOT (e.g Province:1 comes after Country:0)")
+        logger.warn("Use special keyword 'Continent' (e.g Continent Id, Continent, Country Id, Country) to migrate from the ROOT location (Country)")
+        logError(promise, "UNRECOGNIZED_TAG: $level does not exist. Import/use correct location tag to continue.")
         return false
       }
 
       if (!levelId.endsWith(ID, true) || !levelId.split(" ").containsAll(level.split(" "))) {
         logError(
           promise, """
-          Error: INCORRECT format for columns ($levelId and $level)
-          Columns MUST be named in the order of location levels with the id column preceding e.g. Country Id, Country, Province Id, Province
+          INVALID_NAME: wrong name used for columns ($levelId and $level) Columns MUST be named in the order of
+          location levels with the id column preceding e.g.Country Id, Country, Province Id, Province
         """.trimIndent()
         )
         return false
@@ -327,7 +339,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         properties = LocationProperties(
           parentId = parentId,
           name = name,
-          geographicalLevel = geoLevels.getOrDefault(locationTag, 0)
+          geoGraphicLevel = geoLevels.getOrDefault(locationTag, 0)
         ),
         isNew = isNewLocation,
         hasTeam = hasTeam,

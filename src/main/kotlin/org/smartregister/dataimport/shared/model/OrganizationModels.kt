@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 class Organization {
+
   constructor() {
     this.active = true
     this.type = OrganizationCoding()

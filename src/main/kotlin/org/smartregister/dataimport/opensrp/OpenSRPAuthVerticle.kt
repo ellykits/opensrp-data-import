@@ -37,7 +37,8 @@ class OpenSRPAuthVerticle : BaseVerticle() {
         getAccessToken()
       }
     } catch (throwable: Throwable) {
-      logger.error("Keycloak configuration error", throwable)
+      logger.error("Keycloak configuration error")
+      vertx.exceptionHandler().handle(throwable)
     }
 
   }

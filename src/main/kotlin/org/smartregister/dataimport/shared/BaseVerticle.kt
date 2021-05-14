@@ -186,6 +186,8 @@ abstract class BaseVerticle : CoroutineVerticle() {
       put(SOURCE_FILE, config.getString(SOURCE_FILE, ""))
       put(USERS_FILE, config.getString(USERS_FILE, ""))
       put(SKIP_LOCATION_TAGS, config.getBoolean(SKIP_LOCATION_TAGS, false))
+      put(SKIP_LOCATIONS, config.getBoolean(SKIP_LOCATIONS, false))
+      put(SKIP_USER_GROUP, config.getBoolean(SKIP_USER_GROUP, false))
       put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, ""))
     }
 
@@ -270,7 +272,6 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
-
   protected fun completeTask(dataLoadAddress: String = "data", dataItem: DataItem? = null, timerId: Long? = null) {
     val data = when (dataLoadAddress) {
       EventBusAddress.OPENMRS_USERS_LOAD -> "users"
@@ -280,7 +281,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       else -> "data"
     }
     logger.info("TASK COMPLETED: ${dataItem?.name?.lowercase() ?: data} data migrated")
-    if (dataItem != null) vertx.eventBus().send(EventBusAddress.TASK_COMPLETE, dataItem.name)
+    if (dataItem != null) vertx.eventBus().publish(EventBusAddress.TASK_COMPLETE, dataItem.name)
     if (timerId != null) vertx.cancelTimer(timerId)
   }
 

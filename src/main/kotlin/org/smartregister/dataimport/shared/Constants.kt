@@ -1,5 +1,6 @@
 package org.smartregister.dataimport.shared
 
+const val CONTINENT = "Continent"
 const val LOCATIONS = "locations"
 const val TEAMS = "teams"
 const val TEAM_LOCATIONS = "team_locations"
@@ -25,6 +26,8 @@ const val IMPORT_OPTION = "import_option"
 const val SOURCE_FILE = "source_file"
 const val USERS_FILE = "users_file"
 const val SKIP_LOCATION_TAGS = "skipLocationTags"
+const val SKIP_LOCATIONS = "skipLocations"
+const val SKIP_USER_GROUP = "skipUserGroup"
 const val GENERATE_TEAMS = "generateTeams"
 const val ACTION = "action"
 const val PAYLOAD = "payload"
@@ -32,5 +35,5 @@ const val HOME_DIR_PROPERTY = "user.home"
 const val OPENSRP_DATA_PATH = "opensrp-data"
 
 enum class DataItem {
-  LOCATIONS, ORGANIZATIONS, ORGANIZATION_LOCATIONS, KEYCLOAK_USERS, KEYCLOAK_USERS_GROUPS, PRACTITIONERS, PRACTITIONER_ROLES,
+  LOCATION_TAGS, LOCATIONS, ORGANIZATIONS, ORGANIZATION_LOCATIONS, KEYCLOAK_USERS, KEYCLOAK_USERS_GROUPS, PRACTITIONERS, PRACTITIONER_ROLES
 }

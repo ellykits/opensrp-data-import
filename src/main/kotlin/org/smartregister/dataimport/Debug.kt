@@ -14,9 +14,9 @@ fun main() {
   val configs = JsonObject().apply {
     put(IMPORT_OPTION, "locations")
     put(SOURCE_FILE, "assets/locations.csv")
-    put(USERS_FILE, "assets/users.csv")
-    put(SKIP_LOCATION_TAGS, true)
-    put(GENERATE_TEAMS, "Health Facility")
+//    put(USERS_FILE, "assets/users.csv")
+    put(SKIP_LOCATION_TAGS, false)
+//    put(GENERATE_TEAMS, "Health Facility")
   }
   Vertx.vertx().deployVerticle(MainVerticle(), deploymentOptionsOf(config = configs))
 }

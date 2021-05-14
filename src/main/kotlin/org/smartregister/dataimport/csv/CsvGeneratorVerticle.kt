@@ -4,6 +4,8 @@ import io.vertx.core.json.JsonObject
 import org.smartregister.dataimport.shared.*
 import org.smartregister.dataimport.shared.model.Organization
 import org.smartregister.dataimport.shared.model.OrganizationLocation
+import org.smartregister.dataimport.shared.model.Practitioner
+import org.smartregister.dataimport.shared.model.PractitionerRole
 import java.io.File
 import java.io.IOException
 import java.nio.file.FileSystemException
@@ -31,6 +33,8 @@ class CsvGeneratorVerticle : BaseVerticle() {
           when (DataItem.valueOf(fileName.uppercase())) {
             DataItem.ORGANIZATIONS -> writeCsv<Organization>(fileName, payload)
             DataItem.ORGANIZATION_LOCATIONS -> writeCsv<OrganizationLocation>(fileName, payload)
+            DataItem.PRACTITIONERS -> writeCsv<Practitioner>(fileName, payload)
+            DataItem.PRACTITIONER_ROLES -> writeCsv<PractitionerRole>(fileName, payload)
             else -> logger.info("CSV File not supported")
           }
         }
