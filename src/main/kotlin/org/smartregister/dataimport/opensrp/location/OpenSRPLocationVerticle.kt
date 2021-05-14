@@ -333,8 +333,8 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           getUniqueName(parentCellRanges.plus(childCellRanges))
         }
       }
-
-      if (locationIdsMap.containsKey(key)) { //At this point there is a matching location that was already processed
+      //At this point there is a matching location that was already processed. Also skip locations with no names
+      if (locationIdsMap.containsKey(key) || nameCellRange.value.isBlank()) {
         continue
       }
 

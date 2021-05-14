@@ -66,7 +66,7 @@ class Application : CliktCommand(name = "opensrp-data-import") {
         6. practitioner_roles = Use assign practitioners to teams
 
     """.trimIndent(),
-    names = arrayOf("--import")
+    names = arrayOf("--import", "-i")
   ).choice(
     getChoice(DataItem.LOCATIONS),
     getChoice(DataItem.ORGANIZATIONS),
