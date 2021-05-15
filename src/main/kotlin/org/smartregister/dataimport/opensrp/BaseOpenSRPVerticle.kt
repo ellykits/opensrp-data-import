@@ -6,33 +6,50 @@ import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpResponse
 import io.vertx.kotlin.coroutines.await
+import io.vertx.kotlin.coroutines.awaitEvent
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import org.smartregister.dataimport.shared.*
+import kotlin.math.ceil
 
 /**
  * Subclass of [BaseVerticle] which is the base class for all classes with OpenSRP related code
  */
 abstract class BaseOpenSRPVerticle : BaseVerticle() {
 
+  override suspend fun start() {
+    super.start()
+    val loadFromOpenMRS = config.getString(SOURCE_FILE, "").isNullOrBlank()
+    if (loadFromOpenMRS) {
+      val eventBus = vertx.eventBus()
+      eventBus.consumer<String>(EventBusAddress.TASK_COMPLETE).handler {
+        eventBus.send(EventBusAddress.APP_SHUTDOWN, true)
+      }
+    }
+  }
+
   /**
    * This function consumes the messaged in the event bus from the [countAddress]. Once A count has been received,
    * the function request for data from OpenMRS periodically (as configured via the [requestInterval] property)
    * via event bus through [loadAddress]. This will prompt querying OpenMRS
-   * database for data once the data is received the callback method [action] with the data as its parameter
+   * database for data once the data is received the callback method [action] with the data as its parameter.
+   * [dataItem]
    */
-  protected fun consumeOpenMRSData(countAddress: String, loadAddress: String, action: suspend (JsonArray) -> Unit) {
-    vertx.eventBus().consumer<Int>(countAddress).handler {
+  protected fun consumeOpenMRSData(
+    dataItem: DataItem, countAddress: String, loadAddress: String, action: suspend (JsonArray) -> Unit
+  ) {
+    vertx.eventBus().consumer<Int>(countAddress).handler { countMessage ->
       try {
         var offset = 0
-        val count = it.body()
-        vertx.setPeriodic(requestInterval) { timerId ->
-          launch(vertx.dispatcher()) {
-            if (offset >= count) {
-              completeTask(loadAddress, timerId = timerId)
-            }
+        val count = countMessage.body()
+        val numberOfRequests = ceil(count.toDouble().div(limit.toDouble()))
+
+        launch(vertx.dispatcher()) {
+          startVertxCounter(dataItem = dataItem, dataSize = numberOfRequests.toLong())
+          while (offset <= count) {
+            awaitEvent<Long> { vertx.setTimer(requestInterval, it) }
             val message = awaitResult<Message<JsonArray>> { handler ->
               vertx.eventBus().request(loadAddress, offset, handler)
             }

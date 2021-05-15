@@ -3,8 +3,10 @@ package org.smartregister.dataimport.opensrp
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.json.JsonArray
 import io.vertx.ext.web.client.HttpResponse
+import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import org.smartregister.dataimport.openmrs.OpenMRSUserRoleVerticle
+import org.smartregister.dataimport.shared.DataItem
 import org.smartregister.dataimport.shared.EventBusAddress
 
 /**
@@ -16,6 +18,7 @@ class OpenSRPPractitionerRoleVerticle : BaseOpenSRPVerticle() {
     super.start()
     vertx.deployVerticle(OpenMRSUserRoleVerticle())
     consumeOpenMRSData(
+      dataItem= DataItem.PRACTITIONER_ROLES,
       countAddress = EventBusAddress.OPENMRS_USER_ROLE_COUNT,
       loadAddress = EventBusAddress.OPENMRS_USER_ROLE_LOAD,
       action = this::postUserRoles
@@ -25,6 +28,10 @@ class OpenSRPPractitionerRoleVerticle : BaseOpenSRPVerticle() {
   private suspend fun postUserRoles(teams: JsonArray) {
     awaitResult<HttpResponse<Buffer>?> {
       webRequest(url = config.getString("opensrp.rest.practitioner.role.url"), payload = teams, handler = it)
-    }?.logHttpResponse()
+    }?.run {
+      logHttpResponse()
+      val counter = vertx.sharedData().getCounter(DataItem.PRACTITIONER_ROLES.name).await()
+      checkTaskCompletion(counter, DataItem.PRACTITIONER_ROLES)
+    }
   }
 }

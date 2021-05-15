@@ -39,16 +39,15 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
       throw DataImportException("Provider Group Missing!")
     }
 
-
     val url = "$baseUrl/$userId/groups/$providerGroupId"
     awaitResult<HttpResponse<Buffer>?> {
       webRequest(method = HttpMethod.PUT, url = url, handler = it)
     }?.run {
       logHttpResponse()
-      if (!loadFromOpenMRS) {
-        val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS_GROUPS.name).await()
-        checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUPS)
-      }
+
+      val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS_GROUPS.name).await()
+      checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUPS)
+
     }
   }
 

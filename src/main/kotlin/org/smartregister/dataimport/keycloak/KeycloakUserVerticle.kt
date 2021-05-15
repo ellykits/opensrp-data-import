@@ -71,8 +71,6 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
   }
 
   private suspend fun createUser(users: JsonArray) {
-
-
     if (!users.isEmpty) {
       //Filter out openmrs & daemon users as they are no longer needed
       try {
@@ -90,10 +88,8 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
               )
             }?.run {
               logHttpResponse()
-              if (!loadFromOpenMRS) {
-                val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS.name).await()
-                checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS)
-              }
+              val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS.name).await()
+              checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS)
             }
           }
       } catch (throwable: Throwable) {

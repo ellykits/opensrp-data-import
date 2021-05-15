@@ -55,6 +55,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     if (sourceFile.isNullOrBlank()) {
       vertx.deployVerticle(OpenMRSLocationVerticle())
       consumeOpenMRSData(
+        dataItem= DataItem.LOCATIONS,
         countAddress = EventBusAddress.OPENMRS_LOCATIONS_COUNT,
         loadAddress = EventBusAddress.OPENMRS_LOCATIONS_LOAD,
         action = this::postLocations
@@ -101,7 +102,8 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           }
           DataItem.ORGANIZATION_LOCATIONS -> {
             keycloakUsers = organizationUsers.map { it.value }.flatten().onEach {
-              it.organizationLocation = locationIdsMap["${it.parentLocation}|${it.location}"] //name separated with '|' sign
+              it.organizationLocation =
+                locationIdsMap["${it.parentLocation}|${it.location}"] //name separated with '|' sign
             }
             logger.info("Posting ${keycloakUsers.size} users to Keycloak")
             val keycloakUsersChunked = keycloakUsers.chunked(limit)
@@ -185,7 +187,11 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         payload = locations,
         handler = it
       )
-    }?.logHttpResponse()
+    }?.run {
+      logHttpResponse()
+      val counter = vertx.sharedData().getCounter(DataItem.LOCATIONS.name).await()
+      checkTaskCompletion(counter, DataItem.LOCATIONS)
+    }
   }
 
   private suspend fun extractUsersFromCSV(usersFile: String) {
@@ -248,11 +254,11 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           logError(promise, exception.localizedMessage)
         }
 
-        val newLocations = allLocations.filter { it.isNew }.onEach {
+        val newLocations = allLocations.onEach {
           if (it.assignTeam && !generateTeams.isNullOrBlank()) {
             generateOrganizations(it)
           }
-        }.chunked(limit)
+        }.filter { it.isNew }.chunked(limit)
 
         //Associate location to organization for future mapping with practitioners
         locationOrganizationMap = organizationLocations.filterNot { it.jurisdiction == null }

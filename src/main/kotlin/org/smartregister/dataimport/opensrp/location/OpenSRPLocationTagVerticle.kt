@@ -19,12 +19,6 @@ class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
   override suspend fun start() {
     super.start()
 
-    vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler { message ->
-      if(DataItem.valueOf(message.body()) == DataItem.LOCATION_TAGS){
-        vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
-      }
-    }
-
     val skipLocations = config.getBoolean(SKIP_LOCATIONS)
     val counter =  vertx.sharedData().getCounter(DataItem.LOCATION_TAGS.name).await()
     launch(vertx.dispatcher()) {

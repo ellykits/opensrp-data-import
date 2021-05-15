@@ -246,7 +246,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
   protected fun <T> consumeCSVData(csvData: List<List<T>>, dataItem: DataItem, action: suspend (List<T>) -> Unit) {
     if (csvData.isEmpty()) {
       logger.info("TASK IGNORED: NO ${dataItem.name.lowercase()} data to migrate to OpenSRP")
-      vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
+      completeTask(dataItem = dataItem)
       return
     }
     try {
@@ -256,11 +256,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
           DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUPS -> {
             logger.info("TASK STARTED: Started single request tasks with ${requestInterval / 1000} seconds intervals")
           }
-          else -> {
-            val requestsCount =
-              vertx.sharedData().getCounter(dataItem.name).await().addAndGet(csvData.size.toLong()).await()
-            logger.info("TASK STARTED: Submitting $requestsCount Request(s) with ${requestInterval / 1000} seconds interval")
-          }
+          else -> startVertxCounter(dataItem, csvData.size.toLong())
         }
 
         for ((index, _) in csvData.withIndex()) {
@@ -273,24 +269,20 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
-  protected fun completeTask(dataLoadAddress: String = "data", dataItem: DataItem? = null, timerId: Long? = null) {
-    val data = when (dataLoadAddress) {
-      EventBusAddress.OPENMRS_USERS_LOAD -> "users"
-      EventBusAddress.OPENMRS_TEAM_LOCATIONS_LOAD -> "team locations mapping"
-      EventBusAddress.OPENMRS_TEAMS_LOAD -> "teams"
-      EventBusAddress.OPENMRS_LOCATIONS_LOAD -> "locations"
-      else -> "data"
-    }
-    logger.info("TASK COMPLETED: ${dataItem?.name?.lowercase() ?: data} data migrated")
-    if (dataItem != null) vertx.eventBus().publish(EventBusAddress.TASK_COMPLETE, dataItem.name)
-    if (timerId != null) vertx.cancelTimer(timerId)
+  protected suspend fun startVertxCounter(dataItem: DataItem, dataSize: Long) {
+    val requestsCount =
+      vertx.sharedData().getCounter(dataItem.name).await().addAndGet(dataSize).await()
+    logger.info("TASK STARTED: Submitting $requestsCount Request(s) with ${requestInterval / 1000} seconds interval")
+  }
+
+  protected fun completeTask(dataItem: DataItem) {
+    logger.info("TASK COMPLETED: ${dataItem.name.lowercase()} migrated")
+    vertx.eventBus().publish(EventBusAddress.TASK_COMPLETE, dataItem.name)
   }
 
   protected suspend fun checkTaskCompletion(counter: Counter, dataItem: DataItem) {
     val currentCount = counter.decrementAndGet().await()
-    if (currentCount == 0L) {
-      completeTask(dataItem = dataItem)
-    }
+    if (currentCount == 0L) completeTask(dataItem = dataItem)
   }
 
   companion object {

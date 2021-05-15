@@ -5,6 +5,7 @@ import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpResponse
+import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
@@ -59,6 +60,7 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
     }
 
     consumeOpenMRSData(
+      dataItem= DataItem.PRACTITIONERS,
       countAddress = EventBusAddress.OPENMRS_USERS_COUNT,
       loadAddress = EventBusAddress.OPENMRS_USERS_LOAD,
       action = this::createPractitioners
@@ -80,8 +82,11 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
     }
     awaitResult<HttpResponse<Buffer>?> {
       webRequest(url = config.getString("opensrp.rest.practitioner.url"), payload = practitionerList, handler = it)
-    }?.logHttpResponse()
-
+    }?.run {
+      logHttpResponse()
+      val counter = vertx.sharedData().getCounter(DataItem.PRACTITIONERS.name).await()
+      checkTaskCompletion(counter, DataItem.PRACTITIONERS)
+    }
   }
 
 }
