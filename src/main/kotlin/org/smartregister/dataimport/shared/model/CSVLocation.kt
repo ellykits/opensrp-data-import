@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 class CSVLocation() {
 
-  constructor(parentId: String? , uniqueName: String?, id: String?, exactName: String?, tag: String?): this() {
+  constructor(parentId: String?, uniqueName: String?, id: String?, exactName: String?, tag: String?) : this() {
     this.parentId = parentId
     this.uniqueName = uniqueName
     this.id = id

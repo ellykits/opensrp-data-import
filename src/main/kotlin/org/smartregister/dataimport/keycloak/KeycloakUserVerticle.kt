@@ -30,7 +30,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
 
       vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler {
         // Assign users to 'Provider' group after creation
-        when(DataItem.valueOf(it.body())) {
+        when (DataItem.valueOf(it.body())) {
           DataItem.KEYCLOAK_USERS -> {
             launch(vertx.dispatcher()) {
               if (!config.getBoolean(SKIP_USER_GROUP, false)) assignUsersToProviderGroup()

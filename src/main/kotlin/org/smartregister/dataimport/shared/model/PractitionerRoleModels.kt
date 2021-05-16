@@ -4,7 +4,7 @@ import com.opencsv.bean.CsvBindByPosition
 import kotlinx.serialization.Serializable
 
 @Serializable
-class PractitionerRole (){
+class PractitionerRole() {
 
   constructor(
     identifier: String,
@@ -12,7 +12,7 @@ class PractitionerRole (){
     organization: String,
     practitioner: String,
     code: PractitionerCode = PractitionerCode()
-  ) :this(){
+  ) : this() {
     this.identifier = identifier
     this.active = active
     this.organization = organization

@@ -162,8 +162,10 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       }.onEach { convertToCSV(DataItem.PRACTITIONERS, it) }
 
   private fun generatePractitionerRoles() =
-    keycloakUsers.filter { it.practitionerId != null && it.username != null && userIdsMap.containsKey(it.username)
-      && it.organizationLocation != null }
+    keycloakUsers.filter {
+      it.practitionerId != null && it.username != null && userIdsMap.containsKey(it.username)
+        && it.organizationLocation != null
+    }
       .map {
         PractitionerRole(
           identifier = UUID.randomUUID().toString(),

@@ -20,7 +20,7 @@ class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
     super.start()
 
     val skipLocations = config.getBoolean(SKIP_LOCATIONS)
-    val counter =  vertx.sharedData().getCounter(DataItem.LOCATION_TAGS.name).await()
+    val counter = vertx.sharedData().getCounter(DataItem.LOCATION_TAGS.name).await()
     launch(vertx.dispatcher()) {
       if (!config.getBoolean(SKIP_LOCATION_TAGS)) {
         config.getString("location.hierarchy")
@@ -44,7 +44,7 @@ class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
 
             }?.run {
               logHttpResponse()
-              if(skipLocations) checkTaskCompletion(counter, DataItem.LOCATION_TAGS)
+              if (skipLocations) checkTaskCompletion(counter, DataItem.LOCATION_TAGS)
             }
           }
       }

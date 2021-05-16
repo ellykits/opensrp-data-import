@@ -35,7 +35,7 @@ class OpenSRPOrganizationLocationVerticle : BaseOpenSRPVerticle() {
       webRequest(
         url = config.getString("opensrp.rest.organization.location.url"), payload = teamLocations, handler = it
       )
-    }?.run{
+    }?.run {
       logHttpResponse()
       val counter = vertx.sharedData().getCounter(DataItem.ORGANIZATION_LOCATIONS.name).await()
       checkTaskCompletion(counter, DataItem.ORGANIZATION_LOCATIONS)
