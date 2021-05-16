@@ -14,8 +14,8 @@ This tool can read data from 2 sources:
 
 | Resource | Endpoint  |
 |:------|:--- |
-| Locations | /opensrp/rest/location/add?is_jurisdiction=true |
 | Location Tags | /opensrp/rest/location-tag |
+| Locations | /opensrp/rest/location/add?is_jurisdiction=true |
 | Organizations | /opensrp/rest/organization/add  |
 | Organization Locations  | /opensrp/rest/organization/assignLocationsAndPlans |
 | Practitioners | /opensrp/rest/practitioner/add |
@@ -25,19 +25,21 @@ This tool can read data from 2 sources:
 
 > NOTE: all opensrp endpoints MUST be set in the `application.properties` file. Conventionally the all start with `opensrp.rest` text
 
+
 ### Usage
 
-1. Download or build the latest version of the `*-fat.jar` from the [Releases](https://github.com/ellykits/opensrp-data-import/releases) . When importing data (from OpenMRS, it is recommended to run the commands in the order described in the documentation.
+1. Download the latest version of the `*-fat.jar` from [Releases](https://github.com/ellykits/opensrp-data-import/releases). Alternatively you can build the project by running the command `./gradlew shadowJar` then locate the uber jar inside `build/lib` directory.
 
-2. Copy the content of the file `application_sample.properties` into your configs file. Replace the placeholders  with the correct values.
+2. Copy the content of the file `application_sample.properties` into your configs file. Replace the placeholders  with the correct values. It is okay to retain the defaults like `request.limit` config but you can alter the figures like required. (Optimal number of batch record that can be processed by OpenSRP in one request is 60 - this is of course dependent on the server specs)
 
-3. Execute the commands as desired.
+3. Execute the commands as desired. When importing data from OpenMRS it is adviced to follow the order defined in the documentation.
 
 > NOTE: Some actions are dependent on others for instance you cannot import teams from OpenMRS without adding the locations first.
 
+
 ### Importing data from OpenMRS
 
-> Set  the value for `location.hierarchy` config with location tags from OpenMRS in the order they were added otherwise the locations will NOT be
+Set  the value for `location.hierarchy` config with location tags from OpenMRS in the order they were added otherwise the locations will NOT be tagged properly
 
 #### Prerequisites
 - Internet connection - This is required by the web client to communicate with OpenSRP
@@ -131,6 +133,7 @@ java -jar opensrp-data-import-2.0.0-SNAPSHOT-fat.jar --configs-file app.properti
 | request.interval | Set time interval in milliseconds between each request. Default `10000` |
 | request.timeout | Sets the timeout in milliseconds. If an action is not completed before this timeout, the action is considered as a failure default `10000`|
 | reset.timeout |  Sets the time in ms before it attempts to re-close the circuit (by going to the half-open state). If the circuit is closed when the timeout is reached, nothing happens. `-1` disables this feature. Default `10000` |
+
 
 ### Building
 
