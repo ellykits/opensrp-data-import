@@ -81,6 +81,8 @@ java -jar opensrp-data-import-2.0.0-SNAPSHOT-fat.jar --configs-file app.properti
 
 --configs-file or -c (required) : Name of the file containing app configurations
 
+--import or -i (required) : The name of the resource to import (The only accepted value is 'locations')
+
 --source-file or -s (required) : Name of file with locations data
 
 --users-file or -u (required) : Name of file with user data
