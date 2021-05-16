@@ -4,6 +4,7 @@ import com.opencsv.CSVWriter
 import com.opencsv.bean.ColumnPositionMappingStrategy
 import com.opencsv.bean.CsvToBeanBuilder
 import com.opencsv.bean.StatefulBeanToCsvBuilder
+import io.vertx.circuitbreaker.CircuitBreaker
 import io.vertx.config.ConfigRetriever
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.config.ConfigStoreOptions
@@ -19,11 +20,13 @@ import io.vertx.ext.web.client.HttpRequest
 import io.vertx.ext.web.client.HttpResponse
 import io.vertx.ext.web.client.WebClient
 import io.vertx.ext.web.multipart.MultipartForm
+import io.vertx.kotlin.circuitbreaker.circuitBreakerOptionsOf
 import io.vertx.kotlin.core.deploymentOptionsOf
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitEvent
 import io.vertx.kotlin.coroutines.dispatcher
+import io.vertx.kotlin.ext.web.client.webClientOptionsOf
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -60,7 +63,11 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected fun jsonEncoder() = Json { encodeDefaults = true }
 
+  private var requestTimeout: Long = 30000
+
   private var workerPoolSize: Int = 10
+
+  private lateinit var circuitBreaker: CircuitBreaker
 
   override suspend fun start() {
     vertx.exceptionHandler { throwable ->
@@ -79,11 +86,24 @@ abstract class BaseVerticle : CoroutineVerticle() {
       val appConfigs = ConfigRetriever.create(vertx, options).config.await()
       config.mergeIn(appConfigs)
 
-      webClient = WebClient.wrap(vertx.createHttpClient())
-
-      workerPoolSize = config.getInteger("worker.pool.size", 10)
       limit = config.getInteger("data.limit", 50)
-      requestInterval = config.getLong("request.interval")
+      workerPoolSize = config.getInteger("worker.pool.size", 10)
+      requestInterval = config.getLong("request.interval", 10)
+      requestTimeout = config.getLong("request.timeout", 30000)
+      val resetTimeout = config.getLong("reset.timeout", 10000)
+
+      val circuitBreakerOptions = circuitBreakerOptionsOf(
+        fallbackOnFailure = true,
+        maxFailures = 5,
+        timeout = requestTimeout,
+        resetTimeout = resetTimeout
+      )
+
+      circuitBreaker = CircuitBreaker.create(CIRCUIT_BREAKER_NAME, vertx, circuitBreakerOptions).fallback {
+        logger.error("SERVER ERROR: Attempting retry after ${circuitBreakerOptions.maxFailures} failures", it)
+      }
+
+      webClient = WebClient.wrap(vertx.createHttpClient(), webClientOptionsOf(keepAlive = true, verifyHost = false))
 
       dataDirectoryPath = vertx.executeBlocking<String> {
         try {
@@ -128,26 +148,29 @@ abstract class BaseVerticle : CoroutineVerticle() {
     if (user == null || (user != null && user!!.expired())) {
       return
     }
+    circuitBreaker.execute<Boolean> {
+      try {
+        val httpRequest = httpRequest(method, url)
+          .putHeader("Accept", "application/json")
+          .putHeader("Content-Type", "application/json")
+          .followRedirects(true)
+          .bearerTokenAuthentication(user!!.getAccessToken())
+          .timeout(requestTimeout)
 
-    try {
-      val httpRequest = httpRequest(method, url)
-        .putHeader("Accept", "application/json")
-        .putHeader("Content-Type", "application/json")
-        .followRedirects(true)
-        .bearerTokenAuthentication(user!!.getAccessToken())
-        .timeout(config.getLong("request.timeout"))
+        if (queryParams.isNotEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
 
-      if (queryParams.isNotEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
-
-      when (payload) {
-        is String -> httpRequest.sendBuffer(Buffer.buffer(payload), handler)
-        is JsonArray -> httpRequest.sendBuffer(payload.toBuffer(), handler)
-        is JsonObject -> httpRequest.sendBuffer(payload.toBuffer(), handler)
-        is MultipartForm -> httpRequest.sendMultipartForm(payload, handler)
-        null -> httpRequest.send(handler)
+        when (payload) {
+          is String -> httpRequest.sendBuffer(Buffer.buffer(payload), handler)
+          is JsonArray -> httpRequest.sendBuffer(payload.toBuffer(), handler)
+          is JsonObject -> httpRequest.sendBuffer(payload.toBuffer(), handler)
+          is MultipartForm -> httpRequest.sendMultipartForm(payload, handler)
+          null -> httpRequest.send(handler)
+        }
+        it.complete(true)
+      } catch (throwable: Throwable) {
+        it.fail(throwable)
+        vertx.exceptionHandler().handle(throwable)
       }
-    } catch (throwable: Throwable) {
-      return
     }
   }
 
@@ -245,8 +268,8 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected fun <T> consumeCSVData(csvData: List<List<T>>, dataItem: DataItem, action: suspend (List<T>) -> Unit) {
     if (csvData.isEmpty()) {
-      logger.info("TASK IGNORED: NO ${dataItem.name.lowercase()} data to migrate to OpenSRP")
-      completeTask(dataItem = dataItem)
+      logger.info("TASK IGNORED: No ${dataItem.name.lowercase()} data to migrate to OpenSRP")
+      completeTask(dataItem = dataItem, skipped = true)
       return
     }
     try {
@@ -300,8 +323,10 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   fun shutDown(dataItem: DataItem) {
     val sourceFile = dataItem.name.lowercase()
-    logger.info("NOT SUPPORTED: Run command with the options --import (locations) --source-file ($sourceFile.csv)" +
-      " --users-file (users.csv)")
+    logger.info(
+      "NOT SUPPORTED: Run command with the options --import (locations) --source-file ($sourceFile.csv)" +
+        " --users-file (users.csv)"
+    )
     vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
   }
 

@@ -32,6 +32,8 @@ const val ACTION = "action"
 const val PAYLOAD = "payload"
 const val HOME_DIR_PROPERTY = "user.home"
 const val OPENSRP_DATA_PATH = "opensrp-data"
+const val CIRCUIT_BREAKER_NAME = "opensrp.data.import.circuit"
+
 
 enum class DataItem {
   LOCATION_TAGS, LOCATIONS, ORGANIZATIONS, ORGANIZATION_LOCATIONS, KEYCLOAK_USERS, KEYCLOAK_USERS_GROUPS, PRACTITIONERS, PRACTITIONER_ROLES
