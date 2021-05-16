@@ -103,6 +103,33 @@ java -jar opensrp-data-import-2.0.0-SNAPSHOT-fat.jar --configs-file app.properti
 
 ```
 
+#### Source file CSV file format
+The locations source is expected to be in this format. Assuming your location hierarchy begins from the Country (level 0) down to Region (level 1), County (level 2) and finally Health Facility level (3), you need to provide a CSV file with the following format:
+
+```csv
+Country Id,Country,Region Id,Region,County Id,County,Health Facility Id,Health Facility
+,Kenya,,Nairobi,,Nairob,,Nairobi Hospital
+```
+
+The ID columns are mandatory as they are used to map locations to their parents. Empty ID column means the location is new, so the system will generate a UUID for it. Exising locations MUST have their IDs pre-populated to avoid duplicating locations.
+Also NOTE the ordering of the columns as per the location hierarchy. It is logical to group all the locations belowing to one level in the same place.
+The tool will validate the csv columns and fail if the correct format is not provided. The only thing that is assumed is you have ordered them corectly.
+
+#### Users file CSV file format
+The CSV tempalte for importing users to Keycloak and adding as practitioners in OpenSRP is as follows:
+
+```csv
+Parent Location,Location,First Name,Last Name,Username,Password
+```
+
+The names of the column headers is not important as the CSV reader uses the position of the column to read the file, the content however MUST be in that order.
+The **Parent Location** is necessary because you can have locations sharing a name at different level. Also not that the names MUST be exactly what was provided in the source file.
+
+
+#### Accessing Generated CSV files
+
+This tool will generate CSV files with the content of the data that has been posted to OpenSRP. These file can be found inside a directory called **`opensrp-data`** in your home director. e.g /home/coder/opensrp-data. The directory is cleared everytime you run the service so Make sure you copy the content of that folder to a different place if you want to retain the data. The files will be named after the resource that has been posted, i.e. `location.csv`, `organizations.csv`,`organzation_locations.csv`, `practitioners.csv` and `practitioner_roles.csv`.
+
 ### Configurations
 
 | Config        | Explanation                                                                             |
@@ -135,9 +162,10 @@ java -jar opensrp-data-import-2.0.0-SNAPSHOT-fat.jar --configs-file app.properti
 | reset.timeout |  Sets the time in ms before it attempts to re-close the circuit (by going to the half-open state). If the circuit is closed when the timeout is reached, nothing happens. `-1` disables this feature. Default `10000` |
 
 
-### Building
+### Building Project
 
-For local development, create a new file `conf/application.properties` and copy content from `application_sample.properties` file.
+For local development, create a new file `conf/application.properties` and copy content from `application_sample.properties` file. The project as a file named `Debug.kt` that mimics the `Main.kt` file that you can use to run and debug the app, update the JSON object used to pass configurations to the app, which would be something similar to passing `args` to the command line application. Just be careful not to debug the app with production configurations.
+
 
 To launch your tests:
 ```
