@@ -23,51 +23,55 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
   override suspend fun start() {
     super.start()
 
-    val baseUrl = config.getString("keycloak.rest.users.url")
-    val queryParameters = mutableMapOf(FIRST to "0", MAX to limit.toString())
-    val countResponse = awaitResult<HttpResponse<Buffer>?> {
-      webRequest(
-        method = HttpMethod.GET,
-        url = config.getString("keycloak.rest.users.count.url"),
-        handler = it
-      )
-    }
+    if (config.getString(SOURCE_FILE, "").isNullOrBlank()) {
+      val baseUrl = config.getString("keycloak.rest.users.url")
+      val queryParameters = mutableMapOf(FIRST to "0", MAX to limit.toString())
+      val countResponse = awaitResult<HttpResponse<Buffer>?> {
+        webRequest(
+          method = HttpMethod.GET,
+          url = config.getString("keycloak.rest.users.count.url"),
+          handler = it
+        )
+      }
 
-    if (countResponse != null) {
-      val userCount = countResponse.bodyAsString().toLong()
-      vertx.setPeriodic(config.getLong("keycloak.user.request.interval", 2500)) { timeId ->
-        if (queryParameters.getValue(FIRST).toLong() >= userCount) {
-          logger.info("Completed fetching ${userIdsMap.size} users from keycloak")
-          vertx.deployVerticle(OpenMRSUserVerticle())
-          vertx.cancelTimer(timeId)
-        }
-        launch(vertx.dispatcher()) {
-          logger.info("Current offset: ${queryParameters[FIRST]} and limit: $limit")
-          val usersResponse = awaitResult<HttpResponse<Buffer>?> {
-            webRequest(
-              method = HttpMethod.GET,
-              queryParams = queryParameters,
-              url = baseUrl,
-              handler = it
-            )
+      if (countResponse != null) {
+        val userCount = countResponse.bodyAsString().toLong()
+        vertx.setPeriodic(config.getLong("keycloak.user.request.interval", 2500)) { timeId ->
+          if (queryParameters.getValue(FIRST).toLong() >= userCount) {
+            logger.info("Completed fetching ${userIdsMap.size} users from keycloak")
+            vertx.deployVerticle(OpenMRSUserVerticle())
+            vertx.cancelTimer(timeId)
           }
-          usersResponse?.bodyAsJsonArray()?.map { it as JsonObject }?.forEach {
-            userIdsMap[it.getString(USERNAME)] = it.getString(ID)
+          launch(vertx.dispatcher()) {
+            logger.info("Current offset: ${queryParameters[FIRST]} and limit: $limit")
+            val usersResponse = awaitResult<HttpResponse<Buffer>?> {
+              webRequest(
+                method = HttpMethod.GET,
+                queryParams = queryParameters,
+                url = baseUrl,
+                handler = it
+              )
+            }
+            usersResponse?.bodyAsJsonArray()?.map { it as JsonObject }?.forEach {
+              userIdsMap[it.getString(USERNAME)] = it.getString(ID)
+            }
+            queryParameters[FIRST] = (queryParameters.getValue(FIRST).toLong() + limit).toString()
           }
-          queryParameters[FIRST] = (queryParameters.getValue(FIRST).toLong() + limit).toString()
         }
       }
+
+      consumeOpenMRSData(
+        dataItem = DataItem.PRACTITIONERS,
+        countAddress = EventBusAddress.OPENMRS_USERS_COUNT,
+        loadAddress = EventBusAddress.OPENMRS_USERS_LOAD,
+        action = this::createPractitioners
+      )
+
+      //Watch for any updates on user id
+      updateUserIds(userIdsMap)
+    } else {
+      shutDown(DataItem.PRACTITIONERS)
     }
-
-    consumeOpenMRSData(
-      dataItem= DataItem.PRACTITIONERS,
-      countAddress = EventBusAddress.OPENMRS_USERS_COUNT,
-      loadAddress = EventBusAddress.OPENMRS_USERS_LOAD,
-      action = this::createPractitioners
-    )
-
-    //Watch for any updates on user id
-    updateUserIds(userIdsMap)
   }
 
   private suspend fun createPractitioners(practitioners: JsonArray) {

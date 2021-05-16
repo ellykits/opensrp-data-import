@@ -32,7 +32,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
     } else {
       vertx.eventBus().consumer<JsonArray>(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD).handler {
         launch(vertx.dispatcher()) {
-          createUser(it.body())
+          getOrCreateUser(it.body())
         }
       }
 
@@ -59,36 +59,40 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
             val message = awaitResult<Message<JsonArray>> { handler ->
               vertx.eventBus().request(EventBusAddress.OPENMRS_USERS_LOAD, offset, handler)
             }
-            createUser(message.body())
+            getOrCreateUser(message.body())
             offset += limit
           }
         }
-
       } catch (throwable: Throwable) {
         vertx.exceptionHandler().handle(throwable)
       }
     }
   }
 
-  private suspend fun createUser(users: JsonArray) {
+  private suspend fun getOrCreateUser(users: JsonArray) {
     if (!users.isEmpty) {
-      //Filter out openmrs & daemon users as they are no longer needed
+      val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS.name).await()
       try {
         users.map { it as JsonObject }
           .onEach { payload ->
-            awaitResult<HttpResponse<Buffer>?> {
-              webRequest(
-                method = HttpMethod.POST,
-                url = config.getString("keycloak.rest.users.url"),
-                payload = payload.apply {
-                  remove(IDENTIFIER)
-                  remove(NAME)
-                },
-                handler = it
-              )
-            }?.run {
-              logHttpResponse()
-              val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS.name).await()
+            val existingUser = checkKeycloakUser(payload.getString(USERNAME))
+            if(existingUser == null) {
+              awaitResult<HttpResponse<Buffer>?> {
+                webRequest(
+                  method = HttpMethod.POST,
+                  url = config.getString("keycloak.rest.users.url"),
+                  payload = payload.apply {
+                    remove(IDENTIFIER)
+                    remove(NAME)
+                  },
+                  handler = it
+                )
+              }?.run {
+                logHttpResponse()
+                checkKeycloakUser(payload.getString(USERNAME))
+                checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS)
+              }
+            } else {
               checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS)
             }
           }
@@ -102,8 +106,8 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
   private suspend fun assignUsersToProviderGroup(users: JsonArray) {
     users.forEach {
       if (it is String) {
-        val user = getUserByUsername(it)
-        if (user != null) assignUserToGroup(user.getString(ID))
+        val user = userIdsMap[it]
+        if (user != null) assignUserToGroup(user)
       }
     }
   }

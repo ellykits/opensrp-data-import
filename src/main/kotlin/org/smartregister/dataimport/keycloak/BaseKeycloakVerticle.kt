@@ -7,13 +7,17 @@ import io.vertx.ext.web.client.HttpResponse
 import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import org.smartregister.dataimport.shared.*
+import java.util.*
 
 abstract class BaseKeycloakVerticle : BaseVerticle() {
 
   protected lateinit var baseUrl: String
 
   protected var providerGroupId: String? = null
+
   protected var loadFromOpenMRS: Boolean = false
+
+  protected val userIdsMap = TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
 
   override suspend fun start() {
     super.start()
@@ -32,6 +36,8 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
       providerGroupId = groupResponse.bodyAsJsonArray().map { it as JsonObject }
         .find { it.getString(NAME).equals(PROVIDER, true) }?.getString(ID)
     }
+
+    updateUserIds(userIdsMap)
   }
 
   protected suspend fun assignUserToGroup(userId: String) {
@@ -44,10 +50,8 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
       webRequest(method = HttpMethod.PUT, url = url, handler = it)
     }?.run {
       logHttpResponse()
-
       val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS_GROUPS.name).await()
       checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUPS)
-
     }
   }
 
@@ -55,26 +59,26 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
    * Search for keycloak user with the provided [username]. Get the first matching item from the response and return
    * Also send data to notify any listener about the user's id so they can update their map accordingly.
    */
-  protected suspend fun getUserByUsername(username: String): JsonObject? {
-    val user =
-      awaitResult<HttpResponse<Buffer>?> {
-        webRequest(
-          method = HttpMethod.GET,
-          url = "$baseUrl?username=$username",
-          handler = it
-        )
-      }
-        ?.bodyAsJsonArray()?.map { it as JsonObject }?.first()
+  protected suspend fun checkKeycloakUser(username: String): JsonObject? {
+    val resultArray = awaitResult<HttpResponse<Buffer>?> {
+      webRequest(
+        method = HttpMethod.GET,
+        url = "$baseUrl?username=$username",
+        handler = it
+      )
+    }?.bodyAsJsonArray()
 
-    if (user != null) {
+    if (resultArray != null && !resultArray.isEmpty) {
+      val userJson = resultArray.map { it as JsonObject }.first()
       try {
-        vertx.eventBus().publish(
-          EventBusAddress.USER_FOUND, JsonObject().put(USERNAME, user.getString(USERNAME)).put(ID, user.getString(ID))
-        )
+        val keycloakUserId = userJson.getString(ID)
+        logger.info("Keycloak $username found")
+        vertx.eventBus()
+          .publish(EventBusAddress.USER_FOUND, JsonObject().put(USERNAME, username).put(ID, keycloakUserId))
       } catch (throwable: Throwable) {
         vertx.exceptionHandler().handle(throwable)
       }
-      return user
+      return userJson
     }
     return null
   }

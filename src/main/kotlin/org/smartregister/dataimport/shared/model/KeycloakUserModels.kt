@@ -3,7 +3,6 @@ package org.smartregister.dataimport.shared.model
 import com.opencsv.bean.CsvBindByPosition
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import java.util.*
 
 @Serializable
 class KeycloakUser {
@@ -39,7 +38,7 @@ class KeycloakUser {
   var organizationLocation: String? = null
 
   @Transient
-  var practitionerId: String = UUID.randomUUID().toString()
+  var practitionerId: String? = null
 
   val credentials: List<KeycloakCredential> = listOf(KeycloakCredential())
 }

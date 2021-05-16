@@ -55,7 +55,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     if (sourceFile.isNullOrBlank()) {
       vertx.deployVerticle(OpenMRSLocationVerticle())
       consumeOpenMRSData(
-        dataItem= DataItem.LOCATIONS,
+        dataItem = DataItem.LOCATIONS,
         countAddress = EventBusAddress.OPENMRS_LOCATIONS_COUNT,
         loadAddress = EventBusAddress.OPENMRS_LOCATIONS_LOAD,
         action = this::postLocations
@@ -102,6 +102,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           }
           DataItem.ORGANIZATION_LOCATIONS -> {
             keycloakUsers = organizationUsers.map { it.value }.flatten().onEach {
+              it.practitionerId = UUID.randomUUID().toString()
               it.organizationLocation =
                 locationIdsMap["${it.parentLocation}|${it.location}"] //name separated with '|' sign
             }
@@ -117,12 +118,12 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
             //Skip assigning users to provider group
             if (config.getBoolean(SKIP_USER_GROUP, false)) {
-              completeTask(dataItem = DataItem.KEYCLOAK_USERS_GROUPS)
-            }
-
-            val usernamesChunked = usernames.chunked(limit)
-            consumeCSVData(usernamesChunked, DataItem.KEYCLOAK_USERS_GROUPS) {
-              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN, DataItem.KEYCLOAK_USERS_GROUPS, it)
+              completeTask(dataItem = DataItem.KEYCLOAK_USERS_GROUPS, skipped = true)
+            } else {
+              val usernamesChunked = usernames.chunked(limit)
+              consumeCSVData(usernamesChunked, DataItem.KEYCLOAK_USERS_GROUPS) {
+                sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN, DataItem.KEYCLOAK_USERS_GROUPS, it)
+              }
             }
           }
           DataItem.KEYCLOAK_USERS_GROUPS -> {
@@ -150,22 +151,24 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private fun generatePractitioners() =
-    keycloakUsers.filter { it.username != null && userIdsMap.containsKey(it.username) }.map {
-      Practitioner(
-        identifier = it.practitionerId,
-        name = "${it.firstName} ${it.lastName}",
-        userId = userIdsMap[it.username]!!,
-        username = it.username!!.lowercase()
-      )
-    }.onEach { convertToCSV(DataItem.PRACTITIONERS, it) }
+    keycloakUsers.filter { it.practitionerId != null && it.username != null && userIdsMap.containsKey(it.username) }
+      .map {
+        Practitioner(
+          identifier = it.practitionerId!!,
+          name = "${it.firstName} ${it.lastName}",
+          userId = userIdsMap[it.username]!!,
+          username = it.username!!.lowercase()
+        )
+      }.onEach { convertToCSV(DataItem.PRACTITIONERS, it) }
 
   private fun generatePractitionerRoles() =
-    keycloakUsers.filter { it.username != null && userIdsMap.containsKey(it.username) && it.organizationLocation != null }
+    keycloakUsers.filter { it.practitionerId != null && it.username != null && userIdsMap.containsKey(it.username)
+      && it.organizationLocation != null }
       .map {
         PractitionerRole(
           identifier = UUID.randomUUID().toString(),
           organization = locationOrganizationMap.getValue(it.organizationLocation!!).organization!!,
-          practitioner = it.practitionerId
+          practitioner = it.practitionerId!!
         )
       }.onEach { convertToCSV(DataItem.PRACTITIONER_ROLES, it) }
 

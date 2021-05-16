@@ -275,14 +275,34 @@ abstract class BaseVerticle : CoroutineVerticle() {
     logger.info("TASK STARTED: Submitting $requestsCount Request(s) with ${requestInterval / 1000} seconds interval")
   }
 
-  protected fun completeTask(dataItem: DataItem) {
-    logger.info("TASK COMPLETED: ${dataItem.name.lowercase()} migrated")
+  protected fun completeTask(dataItem: DataItem, skipped: Boolean = false) {
+    logger.info(
+      "TASK ${if (skipped) "IGNORED" else "COMPLETED"}: ${dataItem.name.lowercase()}" + if (skipped) " not migrated" else " migrated"
+    )
     vertx.eventBus().publish(EventBusAddress.TASK_COMPLETE, dataItem.name)
   }
 
   protected suspend fun checkTaskCompletion(counter: Counter, dataItem: DataItem) {
     val currentCount = counter.decrementAndGet().await()
     if (currentCount == 0L) completeTask(dataItem = dataItem)
+  }
+
+  protected fun updateUserIds(userIdsMap: MutableMap<String, String>) {
+    vertx.eventBus().consumer<JsonObject>(EventBusAddress.USER_FOUND).handler {
+      with(it.body()) {
+        val username = getString(USERNAME)
+        val keycloakId = getString(ID)
+        logger.info("Keycloak User Id set for $username")
+        userIdsMap[username] = keycloakId
+      }
+    }
+  }
+
+  fun shutDown(dataItem: DataItem) {
+    val sourceFile = dataItem.name.lowercase()
+    logger.info("NOT SUPPORTED: Run command with the options --import (locations) --source-file ($sourceFile.csv)" +
+      " --users-file (users.csv)")
+    vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
   }
 
   companion object {

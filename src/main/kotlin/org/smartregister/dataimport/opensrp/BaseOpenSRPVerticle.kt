@@ -3,7 +3,6 @@ package org.smartregister.dataimport.opensrp
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.Message
 import io.vertx.core.json.JsonArray
-import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpResponse
 import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitEvent
@@ -11,7 +10,10 @@ import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
-import org.smartregister.dataimport.shared.*
+import org.smartregister.dataimport.shared.BaseVerticle
+import org.smartregister.dataimport.shared.DataItem
+import org.smartregister.dataimport.shared.EventBusAddress
+import org.smartregister.dataimport.shared.SOURCE_FILE
 import kotlin.math.ceil
 
 /**
@@ -90,16 +92,5 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
     vertx.sharedData().getCounter(dataItem.name).await().addAndGet(data.size.toLong()).await()
     val payload = JsonArray(jsonEncoder().encodeToString(data))
     vertx.eventBus().send(address, payload)
-  }
-
-  protected fun updateUserIds(userIdsMap: MutableMap<String, String>) {
-    vertx.eventBus().consumer<JsonObject>(EventBusAddress.USER_FOUND).handler {
-      with(it.body()) {
-        val username = getString(USERNAME)
-        val keycloakId = getString(ID)
-        logger.info("Keycloak user Id set for $username")
-        userIdsMap[username] = keycloakId
-      }
-    }
   }
 }

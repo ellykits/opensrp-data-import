@@ -25,6 +25,8 @@ class OpenSRPOrganizationLocationVerticle : BaseOpenSRPVerticle() {
         loadAddress = EventBusAddress.OPENMRS_TEAM_LOCATIONS_LOAD,
         action = this::mapTeamWithLocation
       )
+    } else {
+      shutDown(DataItem.ORGANIZATION_LOCATIONS)
     }
   }
 
