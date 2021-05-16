@@ -276,8 +276,8 @@ abstract class BaseVerticle : CoroutineVerticle() {
       launch(vertx.dispatcher()) {
         // do not create counter for key as requests are made one by one
         when (dataItem) {
-          DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUPS -> {
-            logger.info("TASK STARTED: Started single request tasks with ${requestInterval / 1000} seconds intervals")
+          DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUP -> {
+            logger.info("TASK STARTED: Sending requests, interval $requestInterval seconds.")
           }
           else -> startVertxCounter(dataItem, csvData.size.toLong())
         }
@@ -293,9 +293,8 @@ abstract class BaseVerticle : CoroutineVerticle() {
   }
 
   protected suspend fun startVertxCounter(dataItem: DataItem, dataSize: Long) {
-    val requestsCount =
-      vertx.sharedData().getCounter(dataItem.name).await().addAndGet(dataSize).await()
-    logger.info("TASK STARTED: Submitting $requestsCount Request(s) with ${requestInterval / 1000} seconds interval")
+    val requestsCount = vertx.sharedData().getCounter(dataItem.name).await().addAndGet(dataSize).await()
+    logger.info("TASK STARTED: Submitting $requestsCount requests, ${requestInterval / 1000} seconds interval between each request")
   }
 
   protected fun completeTask(dataItem: DataItem, skipped: Boolean = false) {

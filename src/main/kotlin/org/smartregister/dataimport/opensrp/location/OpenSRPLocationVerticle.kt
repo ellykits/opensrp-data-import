@@ -118,15 +118,15 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
             //Skip assigning users to provider group
             if (config.getBoolean(SKIP_USER_GROUP, false)) {
-              completeTask(dataItem = DataItem.KEYCLOAK_USERS_GROUPS, skipped = true)
+              completeTask(dataItem = DataItem.KEYCLOAK_USERS_GROUP, skipped = true)
             } else {
               val usernamesChunked = usernames.chunked(limit)
-              consumeCSVData(usernamesChunked, DataItem.KEYCLOAK_USERS_GROUPS) {
-                sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN, DataItem.KEYCLOAK_USERS_GROUPS, it)
+              consumeCSVData(usernamesChunked, DataItem.KEYCLOAK_USERS_GROUP) {
+                sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN, DataItem.KEYCLOAK_USERS_GROUP, it)
               }
             }
           }
-          DataItem.KEYCLOAK_USERS_GROUPS -> {
+          DataItem.KEYCLOAK_USERS_GROUP -> {
             practitioners = generatePractitioners()
             consumeCSVData(practitioners.chunked(limit), DataItem.PRACTITIONERS) {
               postData(config.getString("opensrp.rest.practitioner.url"), it, DataItem.PRACTITIONERS)

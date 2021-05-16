@@ -11,9 +11,9 @@ import java.util.*
 
 abstract class BaseKeycloakVerticle : BaseVerticle() {
 
-  protected lateinit var baseUrl: String
+  private lateinit var baseUrl: String
 
-  protected var providerGroupId: String? = null
+  private var providerGroupId: String? = null
 
   protected var loadFromOpenMRS: Boolean = false
 
@@ -50,8 +50,8 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
       webRequest(method = HttpMethod.PUT, url = url, handler = it)
     }?.run {
       logHttpResponse()
-      val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS_GROUPS.name).await()
-      checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUPS)
+      val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS_GROUP.name).await()
+      checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUP)
     }
   }
 
