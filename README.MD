@@ -42,9 +42,9 @@ This tool can read data from 2 sources:
 Set  the value for `location.hierarchy` config with location tags from OpenMRS in the order they were added otherwise the locations will NOT be tagged properly
 
 #### Prerequisites
-- Internet connection - This is required by the web client to communicate with OpenSRP
+- Internet connection - The web client needs this to communicate to OpenSRP
 - Java 11 installed (code is compiled with Java 11)
-- Access to OpenMRS database (Enable remote database access, You can create a user with remote database access and disable them after the process)
+- Access to OpenMRS database (Enable remote database access, you can create a user with remote database access and disable them after the process)
 -  MySQL version 5.7+  (Currently the queries used on OpenMRS database use `json_object` and `json_array` data types that are only available in versions 5.7 and above
 
 #### Command options
@@ -71,7 +71,7 @@ java -jar opensrp-data-import-2.0.0-SNAPSHOT-fat.jar --configs-file app.properti
 ### Import data from CSV file
 
 #### Prerequisites
-- Internet connection - This is required by the web client to communicate with OpenSRP
+- Internet connection - The web client needs this to communicate to OpenSRP
 - Java 11 installed (code is compiled with Java 11)
 
 #### Command options
