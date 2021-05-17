@@ -101,7 +101,7 @@ java -jar opensrp-data-import-2.0.0-SNAPSHOT-fat.jar --configs-file app.properti
 
 ```shell script
 
-java -jar opensrp-data-import-2.0.0-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility"
+java -jar opensrp-data-import-2.0.0-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
 
 ```
 
