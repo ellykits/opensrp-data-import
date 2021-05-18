@@ -5,7 +5,6 @@ import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.core.deploymentOptionsOf
 import org.smartregister.dataimport.main.MainVerticle
 import org.smartregister.dataimport.shared.IMPORT_OPTION
-import org.smartregister.dataimport.shared.SKIP_USER_GROUP
 
 /**
  * Main function for debugging the application in the IDE. Uncomment any of the options to debug or set required system

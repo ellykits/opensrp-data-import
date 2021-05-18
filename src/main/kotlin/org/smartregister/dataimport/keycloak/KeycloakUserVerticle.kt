@@ -65,7 +65,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
         val count = countMessage.body()
         launch(vertx.dispatcher()) {
           vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS.name).await().addAndGet(count.toLong()).await()
-          logger.info("TASK STARTED: Sending requests, interval $requestInterval seconds.")
+          logger.info("TASK STARTED: Sending requests, interval ${requestInterval/1000} seconds.")
           while (offset <= count) {
             awaitEvent<Long> { vertx.setTimer(requestInterval, it) }
             val message = awaitResult<Message<JsonArray>> { handler ->

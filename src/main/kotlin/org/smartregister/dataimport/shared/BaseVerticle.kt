@@ -269,7 +269,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
   protected fun <T> consumeCSVData(csvData: List<List<T>>, dataItem: DataItem, action: suspend (List<T>) -> Unit) {
     if (csvData.isEmpty()) {
       logger.info("TASK IGNORED: No ${dataItem.name.lowercase()} data to migrate to OpenSRP")
-      completeTask(dataItem = dataItem, skipped = true)
+      completeTask(dataItem = dataItem, ignored = true)
       return
     }
     try {
@@ -297,9 +297,9 @@ abstract class BaseVerticle : CoroutineVerticle() {
     logger.info("TASK STARTED: Submitting $requestsCount requests, ${requestInterval / 1000} seconds interval between each request")
   }
 
-  protected fun completeTask(dataItem: DataItem, skipped: Boolean = false) {
+  protected fun completeTask(dataItem: DataItem, ignored: Boolean = false) {
     logger.info(
-      "TASK ${if (skipped) "IGNORED" else "COMPLETED"}: ${dataItem.name.lowercase()}" + if (skipped) " not migrated" else " migrated"
+      "TASK ${if (ignored) "IGNORED" else "COMPLETED"}: ${dataItem.name.lowercase()}" + if (ignored) " not migrated" else " migrated"
     )
     vertx.eventBus().publish(EventBusAddress.TASK_COMPLETE, dataItem.name)
   }

@@ -33,6 +33,7 @@ class CsvGeneratorVerticle : BaseVerticle() {
             DataItem.ORGANIZATION_LOCATIONS -> writeCsv<OrganizationLocation>(fileName, payload)
             DataItem.PRACTITIONERS -> writeCsv<Practitioner>(fileName, payload)
             DataItem.PRACTITIONER_ROLES -> writeCsv<PractitionerRole>(fileName, payload)
+            DataItem.KEYCLOAK_USERS -> writeCsv<KeycloakUser>(fileName, payload)
             else -> logger.info("CSV File not supported")
           }
         }

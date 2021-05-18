@@ -29,7 +29,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   private var locationTagsMap = mapOf<String, LocationTag>()
 
-  private var locationIdsMap =  TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
+  private var locationIdsMap = TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
 
   private var organizationUsers = mapOf<String, List<KeycloakUser>>()
 
@@ -62,9 +62,9 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       )
     } else {
       try {
-        val usersFile = config.getString(USERS_FILE)
+        val usersFile = config.getString(USERS_FILE, "")
 
-        if (usersFile.isNotBlank()) {
+        if (!usersFile.isNullOrBlank()) {
           extractUsersFromCSV(usersFile)
           deployVerticle(KeycloakUserVerticle(), commonConfigs())
         }
@@ -101,15 +101,21 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
             }
           }
           DataItem.ORGANIZATION_LOCATIONS -> {
-            keycloakUsers = organizationUsers.map { it.value }.flatten().onEach {
-              it.practitionerId = UUID.randomUUID().toString()
-              it.organizationLocation =
-                locationIdsMap["${it.parentLocation}|${it.location}"] //name separated with '|' sign
-            }
-            logger.info("Posting ${keycloakUsers.size} users to Keycloak")
-            val keycloakUsersChunked = keycloakUsers.chunked(limit)
-            consumeCSVData(keycloakUsersChunked, DataItem.KEYCLOAK_USERS) {
-              sendData(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD, DataItem.KEYCLOAK_USERS, it)
+            if (config.getString(GENERATE_TEAMS, "").isNullOrBlank()) {
+              //Skip adding users to keycloak
+              completeTask(dataItem = DataItem.KEYCLOAK_USERS, ignored = true)
+            } else {
+              keycloakUsers = organizationUsers.map { it.value }.flatten().onEach {
+                it.practitionerId = UUID.randomUUID().toString()
+                it.organizationLocation =
+                  locationIdsMap[locationKey(it)] //name separated with '|' sign
+              }
+
+              logger.info("Posting ${keycloakUsers.size} users to Keycloak")
+              val keycloakUsersChunked = keycloakUsers.chunked(limit)
+              consumeCSVData(keycloakUsersChunked, DataItem.KEYCLOAK_USERS) {
+                sendData(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD, DataItem.KEYCLOAK_USERS, it)
+              }
             }
           }
           DataItem.KEYCLOAK_USERS -> {
@@ -118,7 +124,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
             //Skip assigning users to provider group
             if (config.getBoolean(SKIP_USER_GROUP, false)) {
-              completeTask(dataItem = DataItem.KEYCLOAK_USERS_GROUP, skipped = true)
+              completeTask(dataItem = DataItem.KEYCLOAK_USERS_GROUP, ignored = true)
             } else {
               val usernamesChunked = usernames.chunked(limit)
               consumeCSVData(usernamesChunked, DataItem.KEYCLOAK_USERS_GROUP) {
@@ -200,16 +206,21 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private suspend fun extractUsersFromCSV(usersFile: String) {
-    organizationUsers = vertx.executeBlocking<Map<String, List<KeycloakUser>>> { promise ->
-      try {
-        val users = readCsvData<KeycloakUser>(usersFile, true, 1)
-          .groupBy { it.parentLocation + it.location }
-        promise.complete(users)
-      } catch (exception: IOException) {
-        vertx.exceptionHandler().handle(exception)
-      }
-    }.await()
+    if (!config.getString(GENERATE_TEAMS, "").isNullOrBlank()) {
+      organizationUsers = vertx.executeBlocking<Map<String, List<KeycloakUser>>> { promise ->
+        try {
+          val users = readCsvData<KeycloakUser>(usersFile, true, 1)
+            .groupBy { locationKey(it) }
+          promise.complete(users)
+        } catch (exception: IOException) {
+          promise.fail(exception)
+          vertx.exceptionHandler().handle(exception)
+        }
+      }.await()
+    }
   }
+
+  private fun locationKey(keycloakUser: KeycloakUser) = "${keycloakUser.parentLocation}|${keycloakUser.location}"
 
   private suspend fun extractLocationsFromCSV(sourceFile: String?) {
     val geoLevels: Map<String, Int> = config.getString("location.hierarchy")

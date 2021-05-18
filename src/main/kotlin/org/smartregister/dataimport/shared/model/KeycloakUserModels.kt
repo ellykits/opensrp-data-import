@@ -7,6 +7,13 @@ import kotlinx.serialization.Transient
 @Serializable
 class KeycloakUser {
 
+  constructor()
+
+  constructor(firstName: String, lastName:String, username:String ): this(){
+    this.firstName = firstName
+    this.lastName = lastName
+    this.username = username
+  }
   @Transient
   @CsvBindByPosition(position = 0)
   var parentLocation: String? = null
@@ -19,10 +26,10 @@ class KeycloakUser {
   var firstName: String? = null
 
   @CsvBindByPosition(position = 3)
-  val lastName: String? = null
+  var lastName: String? = null
 
   @CsvBindByPosition(position = 4)
-  val username: String? = null
+  var username: String? = null
 
   @Transient
   @CsvBindByPosition(position = 5)
