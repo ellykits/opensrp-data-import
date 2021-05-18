@@ -277,7 +277,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
         // do not create counter for key as requests are made one by one
         when (dataItem) {
           DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUP -> {
-            logger.info("TASK STARTED: Sending requests, interval $requestInterval seconds.")
+            logger.info("TASK STARTED: Sending requests, interval ${requestInterval/1000} seconds.")
           }
           else -> startVertxCounter(dataItem, csvData.size.toLong())
         }

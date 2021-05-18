@@ -69,14 +69,16 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
     }?.bodyAsJsonArray()
 
     if (resultArray != null && !resultArray.isEmpty) {
-      val userJson = resultArray.map { it as JsonObject }.first()
-      try {
-        val keycloakUserId = userJson.getString(ID)
-        logger.info("Keycloak $username found")
-        vertx.eventBus()
-          .publish(EventBusAddress.USER_FOUND, JsonObject().put(USERNAME, username).put(ID, keycloakUserId))
-      } catch (throwable: Throwable) {
-        vertx.exceptionHandler().handle(throwable)
+      val userJson = resultArray.map { it as JsonObject }.find { it.getString(USERNAME) == username }
+      if (userJson != null) {
+        try {
+          val keycloakUserId = userJson.getString(ID)
+          logger.info("Keycloak $username found")
+          vertx.eventBus()
+            .publish(EventBusAddress.USER_FOUND, JsonObject().put(USERNAME, username).put(ID, keycloakUserId))
+        } catch (throwable: Throwable) {
+          vertx.exceptionHandler().handle(throwable)
+        }
       }
       return userJson
     }
