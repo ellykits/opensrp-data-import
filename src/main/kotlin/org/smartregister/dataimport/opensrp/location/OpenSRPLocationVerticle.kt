@@ -29,7 +29,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   private var locationTagsMap = mapOf<String, LocationTag>()
 
-  private var locationIdsMap = mutableMapOf<String, String>()
+  private var locationIdsMap =  TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
 
   private var organizationUsers = mapOf<String, List<KeycloakUser>>()
 
