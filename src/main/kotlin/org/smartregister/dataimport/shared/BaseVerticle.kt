@@ -57,7 +57,9 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected var limit = 50
 
-  protected var requestInterval: Long = 10000
+  protected var requestInterval: Long = 30000
+
+  protected var keycloakRequestInterval: Long = 1500
 
   protected val concreteClassName: String = this::class.java.simpleName
 
@@ -86,15 +88,16 @@ abstract class BaseVerticle : CoroutineVerticle() {
       val appConfigs = ConfigRetriever.create(vertx, options).config.await()
       config.mergeIn(appConfigs)
 
-      limit = config.getInteger("data.limit", 50)
+      limit = config.getInteger("data.limit", 20)
       workerPoolSize = config.getInteger("worker.pool.size", 10)
       requestInterval = config.getLong("request.interval", 10)
+      keycloakRequestInterval = config.getLong("keycloak.request.interval", 1500)
       requestTimeout = config.getLong("request.timeout", 30000)
       val resetTimeout = config.getLong("reset.timeout", 10000)
 
       val circuitBreakerOptions = circuitBreakerOptionsOf(
         fallbackOnFailure = true,
-        maxFailures = 5,
+        maxFailures = 3,
         timeout = requestTimeout,
         resetTimeout = resetTimeout
       )

@@ -65,7 +65,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
         val count = countMessage.body()
         launch(vertx.dispatcher()) {
           vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS.name).await().addAndGet(count.toLong()).await()
-          logger.info("TASK STARTED: Sending requests, interval ${requestInterval/1000} seconds.")
+          logger.info("TASK STARTED: Sending requests, interval ${requestInterval / 1000} seconds.")
           while (offset <= count) {
             awaitEvent<Long> { vertx.setTimer(requestInterval, it) }
             val message = awaitResult<Message<JsonArray>> { handler ->
@@ -87,6 +87,8 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
       try {
         users.map { it as JsonObject }
           .onEach { payload ->
+            //wait for specified number of times before making next request, default 1 second
+            awaitEvent<Long> { timer -> vertx.setTimer(keycloakRequestInterval, timer) }
             val existingUser = checkKeycloakUser(payload.getString(USERNAME))
             if (existingUser == null) {
               awaitResult<HttpResponse<Buffer>?> {
@@ -116,17 +118,31 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
   }
 
   private suspend fun assignUsersToProviderGroup(users: JsonArray) {
-    users.forEach {
-      if (it is String) {
-        val user = userIdsMap[it]
-        if (user != null) assignUserToGroup(user)
+    try {
+      users.forEach {
+        //wait for specified number of times before making next request, default 1 second
+        awaitEvent<Long> { timer -> vertx.setTimer(keycloakRequestInterval, timer) }
+        if (it is String) {
+          val user = userIdsMap[it]
+          if (user != null) assignUserToGroup(user)
+        }
       }
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
     }
   }
 
   private suspend fun assignUsersToProviderGroup() {
     startVertxCounter(DataItem.KEYCLOAK_USERS_GROUP, userIdsMap.size.toLong())
-    userIdsMap.forEach { assignUserToGroup(it.value) }
+    try {
+      userIdsMap.forEach {
+        //wait for specified number of times before making next request, default 1 second
+        awaitEvent<Long> { timer -> vertx.setTimer(keycloakRequestInterval, timer) }
+        assignUserToGroup(it.value)
+      }
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
+    }
   }
 }
 

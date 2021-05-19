@@ -36,7 +36,7 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
 
       if (countResponse != null) {
         val userCount = countResponse.bodyAsString().toLong()
-        vertx.setPeriodic(config.getLong("keycloak.user.request.interval", 2500)) { timeId ->
+        vertx.setPeriodic(config.getLong("keycloak.request.interval", 2500)) { timeId ->
           if (queryParameters.getValue(FIRST).toLong() >= userCount) {
             logger.info("Completed fetching ${userIdsMap.size} users from keycloak")
             vertx.deployVerticle(OpenMRSUserVerticle())
