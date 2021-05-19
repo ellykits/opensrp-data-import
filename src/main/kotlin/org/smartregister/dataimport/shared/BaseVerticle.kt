@@ -64,7 +64,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected fun jsonEncoder() = Json { encodeDefaults = true }
 
-  private var requestTimeout: Long = 30000
+  private var requestTimeout: Long = -1
 
   private var workerPoolSize: Int = 10
 
@@ -92,7 +92,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       limit = config.getInteger("data.limit", 20)
       maximumRetries = config.getInteger("circuit.breaker.max.retries", 10)
       workerPoolSize = config.getInteger("worker.pool.size", 10)
-      requestTimeout = config.getLong("request.timeout", 60 * 1000)
+      requestTimeout = config.getLong("request.timeout", -1)
       keycloakRequestInterval = config.getLong("keycloak.request.interval", 1500)
       val resetTimeout = config.getLong("reset.timeout", 5000)
 
@@ -150,8 +150,9 @@ abstract class BaseVerticle : CoroutineVerticle() {
   ) {
 
     if (user == null || (user != null && user!!.expired())) return
-    try {
-      circuitBreaker.execute<HttpResponse<Buffer>?>({ cbPromise ->
+
+    circuitBreaker.execute<HttpResponse<Buffer>?>({ cbPromise ->
+      try {
         val httpRequest = httpRequest(method, url)
           .putHeader("Accept", "application/json")
           .putHeader("Content-Type", "application/json")
@@ -178,10 +179,10 @@ abstract class BaseVerticle : CoroutineVerticle() {
             cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
           }
         }
-      }, handler)
-    } catch (throwable: Throwable) {
-      vertx.exceptionHandler().handle(throwable)
-    }
+      } catch (throwable: Throwable) {
+        vertx.exceptionHandler().handle(throwable)
+      }
+    }, handler)
   }
 
   protected fun HttpResponse<Buffer>.logHttpResponse() {
@@ -289,7 +290,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
         when (dataItem) {
           DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUP -> {
             val dataSize = csvData.flatten().size.toLong()
-            logger.info("TASK STARTED: Submitting a total of $dataSize single requests periodically.")
+            logger.info("TASK STARTED: Submitting a total of $dataSize single requests with ${keycloakRequestInterval/1000} seconds delay).")
             startVertxCounter(dataItem = dataItem, dataSize, true)
           }
           else -> startVertxCounter(dataItem, csvData.size.toLong())
@@ -321,7 +322,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected suspend fun checkTaskCompletion(counter: Counter, dataItem: DataItem) {
     val currentCount = counter.decrementAndGet().await()
-    logger.info("${dataItem.name}::Request current counter -> $currentCount")
+    logger.info("${dataItem.name}::Request count down -> $currentCount")
     if (currentCount == 0L) completeTask(dataItem = dataItem)
   }
 

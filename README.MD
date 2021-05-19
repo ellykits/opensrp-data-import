@@ -164,7 +164,7 @@ This tool will generate CSV files with the content of the data that has been pos
 | data.limit | Number of records to send per request. Default `50`|
 | circuit.breaker.max.retries | Maximum of retries to make when connection is lost. Default `10`|
 | request.interval | Set time interval in milliseconds between each request. Default `10000` |
-| request.timeout | Sets the timeout in milliseconds. If an action is not completed before this timeout, the action is considered as a failure default `10000`|
+| request.timeout | Sets the timeout in milliseconds. If an action is not completed before this timeout, the action is considered as a failure default `-1` (no timeout)|
 | reset.timeout |  Sets the time in ms before it attempts to re-close the circuit (by going to the half-open state). If the circuit is closed when the timeout is reached, nothing happens. `-1` disables this feature. Default `10000` |
 
 
