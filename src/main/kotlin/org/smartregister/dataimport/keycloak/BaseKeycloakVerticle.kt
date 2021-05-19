@@ -19,8 +19,13 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
 
   protected val userIdsMap = TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
 
+  protected var requestInterval = 60000L
+
   override suspend fun start() {
     super.start()
+
+    requestInterval = getRequestInterval(DataItem.KEYCLOAK_USERS)
+
     baseUrl = config.getString("keycloak.rest.users.url", "")
 
     val groupResponse =
@@ -69,7 +74,7 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
     }?.bodyAsJsonArray()
 
     if (resultArray != null && !resultArray.isEmpty) {
-      val userJson = resultArray.map { it as JsonObject }.find { it.getString(USERNAME) == username }
+      val userJson = resultArray.map { it as JsonObject }.find { it.getString(USERNAME).equals( username, true) }
       if (userJson != null) {
         try {
           val keycloakUserId = userJson.getString(ID)

@@ -51,7 +51,7 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
         launch(vertx.dispatcher()) {
           startVertxCounter(dataItem = dataItem, dataSize = numberOfRequests.toLong())
           while (offset <= count) {
-            awaitEvent<Long> { vertx.setTimer(requestInterval, it) }
+            awaitEvent<Long> { vertx.setTimer(getRequestInterval(dataItem), it) }
             val message = awaitResult<Message<JsonArray>> { handler ->
               vertx.eventBus().request(loadAddress, offset, handler)
             }

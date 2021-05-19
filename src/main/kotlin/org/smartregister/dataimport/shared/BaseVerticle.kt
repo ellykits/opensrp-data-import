@@ -10,6 +10,7 @@ import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.config.ConfigStoreOptions
 import io.vertx.core.AsyncResult
 import io.vertx.core.Handler
+import io.vertx.core.Promise
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonArray
@@ -42,8 +43,8 @@ import java.nio.file.FileSystems
  * This is the base class extending [CoroutineVerticle] for all the Verticles. It provides the [webClient] used to perform
  * web requests.
  *
- * The [limit] and [requestInterval] are config defaults used to limit the number of records that can be sent per each
- * request and the time period between each server request respectively.
+ * The [limit] is config defaults used to limit the number of records that can be sent per each
+ * request.
  */
 abstract class BaseVerticle : CoroutineVerticle() {
 
@@ -57,8 +58,6 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected var limit = 50
 
-  protected var requestInterval: Long = 30000
-
   protected var keycloakRequestInterval: Long = 1500
 
   protected val concreteClassName: String = this::class.java.simpleName
@@ -69,7 +68,9 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   private var workerPoolSize: Int = 10
 
-  private lateinit var circuitBreaker: CircuitBreaker
+  protected lateinit var circuitBreaker: CircuitBreaker
+
+  private var maximumRetries = 10
 
   override suspend fun start() {
     vertx.exceptionHandler { throwable ->
@@ -89,21 +90,21 @@ abstract class BaseVerticle : CoroutineVerticle() {
       config.mergeIn(appConfigs)
 
       limit = config.getInteger("data.limit", 20)
+      maximumRetries = config.getInteger("circuit.breaker.max.retries", 10)
       workerPoolSize = config.getInteger("worker.pool.size", 10)
-      requestInterval = config.getLong("request.interval", 10)
+      requestTimeout = config.getLong("request.timeout", 60 * 1000)
       keycloakRequestInterval = config.getLong("keycloak.request.interval", 1500)
-      requestTimeout = config.getLong("request.timeout", 30000)
-      val resetTimeout = config.getLong("reset.timeout", 10000)
+      val resetTimeout = config.getLong("reset.timeout", 5000)
 
       val circuitBreakerOptions = circuitBreakerOptionsOf(
-        fallbackOnFailure = true,
-        maxFailures = 3,
-        timeout = requestTimeout,
-        resetTimeout = resetTimeout
+        timeout = resetTimeout,
+        resetTimeout = resetTimeout,
+        maxFailures = 10,
+        maxRetries = maximumRetries
       )
 
-      circuitBreaker = CircuitBreaker.create(CIRCUIT_BREAKER_NAME, vertx, circuitBreakerOptions).fallback {
-        logger.error("SERVER ERROR: Attempting retry after ${circuitBreakerOptions.maxFailures} failures", it)
+      circuitBreaker = CircuitBreaker.create(CIRCUIT_BREAKER_NAME, vertx, circuitBreakerOptions).retryPolicy { count ->
+        count * 2500L
       }
 
       webClient = WebClient.wrap(vertx.createHttpClient(), webClientOptionsOf(keepAlive = true, verifyHost = false))
@@ -151,30 +152,34 @@ abstract class BaseVerticle : CoroutineVerticle() {
     if (user == null || (user != null && user!!.expired())) {
       return
     }
-    circuitBreaker.execute<Boolean> {
-      try {
-        val httpRequest = httpRequest(method, url)
-          .putHeader("Accept", "application/json")
-          .putHeader("Content-Type", "application/json")
-          .followRedirects(true)
-          .bearerTokenAuthentication(user!!.getAccessToken())
-          .timeout(requestTimeout)
+    circuitBreaker.execute<HttpResponse<Buffer>?>({ cbPromise ->
+      val httpRequest = httpRequest(method, url)
+        .putHeader("Accept", "application/json")
+        .putHeader("Content-Type", "application/json")
+        .followRedirects(true)
+        .bearerTokenAuthentication(user!!.getAccessToken())
+        .timeout(requestTimeout)
 
-        if (queryParams.isNotEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
+      if (!queryParams.isNullOrEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
 
-        when (payload) {
-          is String -> httpRequest.sendBuffer(Buffer.buffer(payload), handler)
-          is JsonArray -> httpRequest.sendBuffer(payload.toBuffer(), handler)
-          is JsonObject -> httpRequest.sendBuffer(payload.toBuffer(), handler)
-          is MultipartForm -> httpRequest.sendMultipartForm(payload, handler)
-          null -> httpRequest.send(handler)
+      when (payload) {
+        is String -> httpRequest.sendBuffer(Buffer.buffer(payload)) {
+          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
         }
-        it.complete(true)
-      } catch (throwable: Throwable) {
-        it.fail(throwable)
-        vertx.exceptionHandler().handle(throwable)
+        is MultipartForm -> httpRequest.sendMultipartForm(payload) {
+          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
+        }
+        is JsonArray -> httpRequest.sendBuffer(payload.toBuffer()) {
+          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
+        }
+        is JsonObject -> httpRequest.sendBuffer(payload.toBuffer()) {
+          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
+        }
+        null -> httpRequest.send {
+          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
+        }
       }
-    }
+    }, handler)
   }
 
   protected fun HttpResponse<Buffer>.logHttpResponse() {
@@ -277,10 +282,11 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
     try {
       launch(vertx.dispatcher()) {
-        // do not create counter for key as requests are made one by one
+        // do not create counter for key as requests are made one after the other
+        val requestInterval = getRequestInterval(dataItem)
         when (dataItem) {
           DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUP -> {
-            logger.info("TASK STARTED: Sending requests, interval ${requestInterval/1000} seconds.")
+            logger.info("TASK STARTED: Sending requests, interval ${requestInterval / 1000} seconds.")
           }
           else -> startVertxCounter(dataItem, csvData.size.toLong())
         }
@@ -297,7 +303,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected suspend fun startVertxCounter(dataItem: DataItem, dataSize: Long) {
     val requestsCount = vertx.sharedData().getCounter(dataItem.name).await().addAndGet(dataSize).await()
-    logger.info("TASK STARTED: Submitting $requestsCount requests, ${requestInterval / 1000} seconds interval between each request")
+    logger.info("TASK STARTED: Submitting $requestsCount requests, ${getRequestInterval(dataItem) / 1000} seconds interval between each request")
   }
 
   protected fun completeTask(dataItem: DataItem, ignored: Boolean = false) {
@@ -323,6 +329,23 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
+  /**
+   * Get delay period in milliseconds between each request. Keycloak does not allow batch posting of user data
+   * therefore it has to be configured independently.
+   */
+
+  /**
+   * Get delay period in milliseconds between each request. Keycloak does not allow batch posting of user data
+   * therefore it has to be configured independently.
+   */
+  protected fun getRequestInterval(dataItem: DataItem): Long =
+    when (dataItem) {
+      DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUP -> {
+        config.getLong("keycloak.request.delay", 120000)
+      }
+      else -> config.getLong("request.interval", 30000)
+    }
+
   fun shutDown(dataItem: DataItem) {
     val sourceFile = dataItem.name.lowercase()
     logger.info(
@@ -336,4 +359,9 @@ abstract class BaseVerticle : CoroutineVerticle() {
     var user: User? = null
     var configsFile: String? = null
   }
+}
+
+private fun <T> Promise<T>.handleResponse(response: AsyncResult<T>) {
+  if (response.succeeded()) complete(response.result() as T)
+  else fail(response.cause())
 }

@@ -1,6 +1,7 @@
 package org.smartregister.dataimport.shared
 
 const val LOCATIONS = "locations"
+const val LOCATION_HEADER = "Location"
 const val TEAMS = "teams"
 const val TEAM_LOCATIONS = "team_locations"
 const val USERNAME = "username"

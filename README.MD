@@ -149,7 +149,8 @@ This tool will generate CSV files with the content of the data that has been pos
 | keycloak.realm | Keycloak Realm |
 | keycloak.user.username | Username for Keycloak User|
 | keycloak.user.password | Password for Keycloak User|
-| keycloak.request.interval | Interval for making request to keycloak users |
+| keycloak.request.interval | Interval between single keycloak requests |
+| keycloak.request.delay | Delay in time in milliseconds before keycloak makes another batch request. Default is 1 minute |
 | keycloak.rest.users.url | Get all Keycloak Users endpoint. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/users* |
 | keycloak.rest.users.count.url | Endpoint for counting Keycloak Users. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/users/count* |
 | keycloak.rest.groups.url | Endpoint for fetching Keycloak groups. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/groups* |
@@ -161,6 +162,7 @@ This tool will generate CSV files with the content of the data that has been pos
 | opensrp.rest.practitioner.role.url | OpenSRP endpoint for mapping practitioners to organizations|
 | location.hierarchy | Comma separated string of location levels with their corresponding geographical level. Top level starts from 0. *e.g* *Country:0,Region:1,County:2, Sub-county:3, District:4, Health Facility: 5 * |
 | data.limit | Number of records to send per request. Default `50`|
+| circuit.breaker.max.retries | Maximum of retries to make when connection is lost. Default `10`|
 | request.interval | Set time interval in milliseconds between each request. Default `10000` |
 | request.timeout | Sets the timeout in milliseconds. If an action is not completed before this timeout, the action is considered as a failure default `10000`|
 | reset.timeout |  Sets the time in ms before it attempts to re-close the circuit (by going to the half-open state). If the circuit is closed when the timeout is reached, nothing happens. `-1` disables this feature. Default `10000` |

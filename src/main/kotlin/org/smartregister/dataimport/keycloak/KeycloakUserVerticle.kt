@@ -86,7 +86,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
       val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS.name).await()
       try {
         users.map { it as JsonObject }
-          .onEach { payload ->
+          .forEach { payload ->
             //wait for specified number of times before making next request, default 1 second
             awaitEvent<Long> { timer -> vertx.setTimer(keycloakRequestInterval, timer) }
             val existingUser = checkKeycloakUser(payload.getString(USERNAME))
@@ -103,7 +103,14 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
                 )
               }?.run {
                 logHttpResponse()
-                checkKeycloakUser(payload.getString(USERNAME))
+                val username = payload.getString(USERNAME)
+                //Get Returned user id from the server response
+                val header: String? = this.getHeader(LOCATION_HEADER)
+                header?.let {
+                  val userId = it.substring(it.lastIndexOf("/") + 1).trim()
+                  vertx.eventBus()
+                    .publish(EventBusAddress.USER_FOUND, JsonObject().put(USERNAME, username).put(ID, userId))
+                }
                 checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS)
               }
             } else {

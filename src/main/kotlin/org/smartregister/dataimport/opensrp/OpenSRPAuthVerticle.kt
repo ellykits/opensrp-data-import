@@ -6,6 +6,7 @@ import io.vertx.ext.auth.oauth2.OAuth2FlowType
 import io.vertx.ext.auth.oauth2.OAuth2Options
 import io.vertx.ext.auth.oauth2.providers.KeycloakAuth
 import io.vertx.kotlin.coroutines.await
+import io.vertx.kotlin.coroutines.awaitResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -24,21 +25,26 @@ class OpenSRPAuthVerticle : BaseVerticle() {
 
   override suspend fun start() {
     super.start()
-    try {
-      oAuth2Auth = KeycloakAuth.discover(vertx, OAuth2Options().apply {
-        clientID = config.getString("keycloak.client.id")
-        clientSecret = config.getString("keycloak.client.secret")
-        site = config.getString("keycloak.site")
-        tenant = config.getString("keycloak.realm")
-        flow = OAuth2FlowType.PASSWORD
-        isValidateIssuer = false
-      }).await()
-      if (oAuth2Auth != null) {
-        getAccessToken()
-      }
-    } catch (throwable: Throwable) {
-      logger.error("Keycloak configuration error")
-      vertx.exceptionHandler().handle(throwable)
+    oAuth2Auth = awaitResult {
+      circuitBreaker.execute({ breakerPromise ->
+        KeycloakAuth.discover(vertx, OAuth2Options().apply {
+          clientID = config.getString("keycloak.client.id")
+          clientSecret = config.getString("keycloak.client.secret")
+          site = config.getString("keycloak.site")
+          tenant = config.getString("keycloak.realm")
+          flow = OAuth2FlowType.PASSWORD
+          isValidateIssuer = false
+        }).onSuccess { auth ->
+          if (auth != null) breakerPromise.complete(auth)
+        }.onFailure { throwable ->
+          breakerPromise.fail(throwable)
+          logger.error(throwable.message, throwable)
+        }
+      }, it)
+    }
+
+    if (oAuth2Auth != null) {
+      getAccessToken()
     }
   }
 
