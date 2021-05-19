@@ -125,13 +125,18 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
   }
 
   private suspend fun assignUsersToProviderGroup(users: JsonArray) {
+    val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS_GROUP.name).await()
     try {
       users.forEach {
         //wait for specified number of times before making next request, default 1 second
         awaitEvent<Long> { timer -> vertx.setTimer(keycloakRequestInterval, timer) }
         if (it is String) {
           val user = userIdsMap[it]
-          if (user != null) assignUserToGroup(user)
+          if (user != null) {
+            assignUserToGroup(user)
+          } else { // Ignore any missing and continue count down
+            checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUP)
+          }
         }
       }
     } catch (throwable: Throwable) {

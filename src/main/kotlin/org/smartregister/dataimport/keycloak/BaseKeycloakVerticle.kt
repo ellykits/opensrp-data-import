@@ -50,13 +50,17 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
       throw DataImportException("Provider Group Missing!")
     }
 
-    val url = "$baseUrl/$userId/groups/$providerGroupId"
-    awaitResult<HttpResponse<Buffer>?> {
-      webRequest(method = HttpMethod.PUT, url = url, handler = it)
-    }?.run {
-      logHttpResponse()
-      val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS_GROUP.name).await()
-      checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUP)
+    try {
+      val url = "$baseUrl/$userId/groups/$providerGroupId"
+      awaitResult<HttpResponse<Buffer>?> {
+        webRequest(method = HttpMethod.PUT, url = url, handler = it)
+      }?.run {
+        logHttpResponse()
+        val counter = vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS_GROUP.name).await()
+        checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUP)
+      }
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
     }
   }
 
@@ -74,7 +78,7 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
     }?.bodyAsJsonArray()
 
     if (resultArray != null && !resultArray.isEmpty) {
-      val userJson = resultArray.map { it as JsonObject }.find { it.getString(USERNAME).equals( username, true) }
+      val userJson = resultArray.map { it as JsonObject }.find { it.getString(USERNAME).equals(username, true) }
       if (userJson != null) {
         try {
           val keycloakUserId = userJson.getString(ID)
