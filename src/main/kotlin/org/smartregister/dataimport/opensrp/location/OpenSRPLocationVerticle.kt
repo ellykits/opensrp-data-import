@@ -114,7 +114,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
               logger.info("Posting ${keycloakUsers.size} users to Keycloak")
               val keycloakUsersChunked = keycloakUsers.chunked(limit)
               consumeCSVData(keycloakUsersChunked, DataItem.KEYCLOAK_USERS) {
-                sendData(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD, DataItem.KEYCLOAK_USERS, it)
+                sendData(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD, it)
               }
             }
           }
@@ -128,7 +128,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
             } else {
               val usernamesChunked = usernames.chunked(limit)
               consumeCSVData(usernamesChunked, DataItem.KEYCLOAK_USERS_GROUP) {
-                sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN, DataItem.KEYCLOAK_USERS_GROUP, it)
+                sendData(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN, it)
               }
             }
           }

@@ -120,7 +120,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
         }
       }.await()
 
-      logger.info("$concreteClassName deployed with id: $deploymentID")
+      logger.info("$concreteClassName deployed.")
     } catch (throwable: Throwable) {
       vertx.exceptionHandler().handle(throwable)
     }
@@ -149,37 +149,39 @@ abstract class BaseVerticle : CoroutineVerticle() {
     handler: Handler<AsyncResult<HttpResponse<Buffer>?>>
   ) {
 
-    if (user == null || (user != null && user!!.expired())) {
-      return
+    if (user == null || (user != null && user!!.expired())) return
+    try {
+      circuitBreaker.execute<HttpResponse<Buffer>?>({ cbPromise ->
+        val httpRequest = httpRequest(method, url)
+          .putHeader("Accept", "application/json")
+          .putHeader("Content-Type", "application/json")
+          .followRedirects(true)
+          .bearerTokenAuthentication(user!!.getAccessToken())
+          .timeout(requestTimeout)
+
+        if (!queryParams.isNullOrEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
+
+        when (payload) {
+          is String -> httpRequest.sendBuffer(Buffer.buffer(payload)) {
+            cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
+          }
+          is MultipartForm -> httpRequest.sendMultipartForm(payload) {
+            cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
+          }
+          is JsonArray -> httpRequest.sendBuffer(payload.toBuffer()) {
+            cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
+          }
+          is JsonObject -> httpRequest.sendBuffer(payload.toBuffer()) {
+            cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
+          }
+          null -> httpRequest.send {
+            cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
+          }
+        }
+      }, handler)
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
     }
-    circuitBreaker.execute<HttpResponse<Buffer>?>({ cbPromise ->
-      val httpRequest = httpRequest(method, url)
-        .putHeader("Accept", "application/json")
-        .putHeader("Content-Type", "application/json")
-        .followRedirects(true)
-        .bearerTokenAuthentication(user!!.getAccessToken())
-        .timeout(requestTimeout)
-
-      if (!queryParams.isNullOrEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
-
-      when (payload) {
-        is String -> httpRequest.sendBuffer(Buffer.buffer(payload)) {
-          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
-        }
-        is MultipartForm -> httpRequest.sendMultipartForm(payload) {
-          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
-        }
-        is JsonArray -> httpRequest.sendBuffer(payload.toBuffer()) {
-          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
-        }
-        is JsonObject -> httpRequest.sendBuffer(payload.toBuffer()) {
-          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
-        }
-        null -> httpRequest.send {
-          cbPromise.handleResponse<HttpResponse<Buffer>?>(it)
-        }
-      }
-    }, handler)
   }
 
   protected fun HttpResponse<Buffer>.logHttpResponse() {
@@ -286,7 +288,9 @@ abstract class BaseVerticle : CoroutineVerticle() {
         val requestInterval = getRequestInterval(dataItem)
         when (dataItem) {
           DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUP -> {
-            logger.info("TASK STARTED: Sending requests, interval ${requestInterval / 1000} seconds.")
+            val dataSize = csvData.flatten().size.toLong()
+            logger.info("TASK STARTED: Submitting a total of $dataSize single requests periodically.")
+            startVertxCounter(dataItem = dataItem, dataSize, true)
           }
           else -> startVertxCounter(dataItem, csvData.size.toLong())
         }
@@ -301,9 +305,11 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
-  protected suspend fun startVertxCounter(dataItem: DataItem, dataSize: Long) {
+  protected suspend fun startVertxCounter(dataItem: DataItem, dataSize: Long, singleRequests: Boolean = false) {
     val requestsCount = vertx.sharedData().getCounter(dataItem.name).await().addAndGet(dataSize).await()
-    logger.info("TASK STARTED: Submitting $requestsCount requests, ${getRequestInterval(dataItem) / 1000} seconds interval between each request")
+    if (!singleRequests) {
+      logger.info("TASK STARTED: Submitting $requestsCount requests periodically in ${getRequestInterval(dataItem) / 1000} seconds interval")
+    }
   }
 
   protected fun completeTask(dataItem: DataItem, ignored: Boolean = false) {
@@ -315,6 +321,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected suspend fun checkTaskCompletion(counter: Counter, dataItem: DataItem) {
     val currentCount = counter.decrementAndGet().await()
+    logger.info("${dataItem.name}::Request current counter -> $currentCount")
     if (currentCount == 0L) completeTask(dataItem = dataItem)
   }
 
@@ -323,7 +330,6 @@ abstract class BaseVerticle : CoroutineVerticle() {
       with(it.body()) {
         val username = getString(USERNAME)
         val keycloakId = getString(ID)
-        logger.info("Keycloak User Id set for $username")
         userIdsMap[username] = keycloakId
       }
     }
@@ -355,13 +361,14 @@ abstract class BaseVerticle : CoroutineVerticle() {
     vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
   }
 
+
+  private fun <T> Promise<T>.handleResponse(response: AsyncResult<T>) {
+    if (response.succeeded()) complete(response.result() as T)
+    else fail(response.cause())
+  }
+
   companion object {
     var user: User? = null
     var configsFile: String? = null
   }
-}
-
-private fun <T> Promise<T>.handleResponse(response: AsyncResult<T>) {
-  if (response.succeeded()) complete(response.result() as T)
-  else fail(response.cause())
 }
