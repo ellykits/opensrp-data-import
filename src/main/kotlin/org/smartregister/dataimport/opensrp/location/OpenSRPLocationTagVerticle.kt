@@ -49,9 +49,6 @@ class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
           checkTaskCompletion(counter, DataItem.LOCATION_TAGS)
         }
       }
-    } else {
-      completeTask(DataItem.LOCATION_TAGS, ignored = true)
-      vertx.undeploy(deploymentID)
-    }
+    } else completeTask(DataItem.LOCATION_TAGS, ignored = true)
   }
 }

@@ -8,6 +8,7 @@ import io.vertx.kotlin.coroutines.awaitResult
 import org.smartregister.dataimport.openmrs.OpenMRSTeamVerticle
 import org.smartregister.dataimport.shared.DataItem
 import org.smartregister.dataimport.shared.EventBusAddress
+import org.smartregister.dataimport.shared.OPENMRS_TEAMS
 import org.smartregister.dataimport.shared.SOURCE_FILE
 
 /**
@@ -18,16 +19,14 @@ class OpenSRPOrganizationVerticle : BaseOpenSRPVerticle() {
   override suspend fun start() {
     super.start()
     if (config.getString(SOURCE_FILE, "").isNullOrBlank()) {
-      vertx.deployVerticle(OpenMRSTeamVerticle())
+      deployVerticle(OpenMRSTeamVerticle(), OPENMRS_TEAMS)
       consumeOpenMRSData(
         dataItem = DataItem.ORGANIZATIONS,
         countAddress = EventBusAddress.OPENMRS_TEAMS_COUNT,
         loadAddress = EventBusAddress.OPENMRS_TEAMS_LOAD,
         action = this::postTeams
       )
-    } else {
-      shutDown(DataItem.ORGANIZATIONS)
-    }
+    } else shutDown(DataItem.ORGANIZATIONS)
   }
 
   private suspend fun postTeams(teams: JsonArray) {

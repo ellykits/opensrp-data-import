@@ -59,7 +59,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected var limit = 50
 
-  protected var keycloakRequestInterval: Long = 1500
+  protected var singleRequestInterval: Long = 1500
 
   protected val concreteClassName: String = this::class.java.simpleName
 
@@ -94,7 +94,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       maximumRetries = config.getInteger("circuit.breaker.max.retries", 10)
       workerPoolSize = config.getInteger("worker.pool.size", 10)
       requestTimeout = config.getLong("request.timeout", -1)
-      keycloakRequestInterval = config.getLong("keycloak.request.interval", 1000)
+      singleRequestInterval = config.getLong("single.request.interval", 1000)
       val resetTimeout = config.getLong("reset.timeout", 5000)
 
       val circuitBreakerOptions = circuitBreakerOptionsOf(
@@ -121,7 +121,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
         }
       }.await()
 
-      logger.info("$concreteClassName deployed.")
+      logger.info("$concreteClassName deployed")
     } catch (throwable: Throwable) {
       vertx.exceptionHandler().handle(throwable)
     }
@@ -281,7 +281,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected fun <T> consumeCSVData(csvData: List<List<T>>, dataItem: DataItem, action: suspend (List<T>) -> Unit) {
     if (csvData.isEmpty()) {
-      logger.info("TASK IGNORED: No ${this.taskName(dataItem)} data to migrate to OpenSRP")
+      logger.info("TASK IGNORED [${taskName(dataItem)}]: No data to migrate to OpenSRP")
       completeTask(dataItem = dataItem, ignored = true)
       return
     }
@@ -293,7 +293,6 @@ abstract class BaseVerticle : CoroutineVerticle() {
         when (dataItem) {
           DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUP, DataItem.LOCATION_TAGS -> {
             val dataSize = csvData.flatten().size.toLong()
-            logger.info("TASK STARTED [${taskName(dataItem)}]: Submitting a total of $dataSize single requests with ${requestInterval / 1000} seconds delay/request).")
             startVertxCounter(dataItem = dataItem, dataSize, true)
           }
           else -> startVertxCounter(dataItem, csvData.size.toLong())
@@ -311,19 +310,29 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected suspend fun startVertxCounter(dataItem: DataItem, dataSize: Long, singleRequests: Boolean = false) {
     val requestsCount = vertx.sharedData().getCounter(dataItem.name).await().addAndGet(dataSize).await()
+    val requestInterval = getRequestInterval(dataItem) / 1000
     if (!singleRequests) {
       logger.info(
-        "TASK STARTED [${this.taskName(dataItem)}]: Submitting $requestsCount requests periodically, delay " +
-          "${getRequestInterval(dataItem) / 1000} seconds/request"
+        "TASK STARTED [${this.taskName(dataItem)}]: Submitting $requestsCount request(s) periodically with " +
+          "$requestInterval seconds delay/request"
+      )
+    } else {
+      logger.info(
+        "TASK STARTED [${taskName(dataItem)}]: Submitting $dataSize single request(s) with $requestInterval seconds delay/request"
       )
     }
   }
 
   protected fun completeTask(dataItem: DataItem, ignored: Boolean = false) {
-    logger.info(
-      "TASK ${if (ignored) "IGNORED" else "COMPLETED"} [${this.taskName(dataItem)}]: ${this.taskName(dataItem)}" + if (ignored) " not migrated" else " migrated"
-    )
-    vertx.eventBus().publish(EventBusAddress.TASK_COMPLETE, dataItem.name)
+    with(dataItem) {
+      logger.info(
+        "TASK ${if (ignored) "IGNORED" else "COMPLETED"} [${taskName(this)}]: ${taskName(this)}" +
+          if (ignored) " not migrated" else " migrated"
+      )
+      if (config.getString(SOURCE_FILE).isNullOrBlank())
+        vertx.eventBus().send(EventBusAddress.OPENMRS_TASK_COMPLETE, name)
+      else vertx.eventBus().send(EventBusAddress.TASK_COMPLETE, name)
+    }
   }
 
   protected suspend fun checkTaskCompletion(counter: Counter, dataItem: DataItem) {
@@ -354,19 +363,17 @@ abstract class BaseVerticle : CoroutineVerticle() {
   protected fun getRequestInterval(dataItem: DataItem): Long =
     when (dataItem) {
       DataItem.KEYCLOAK_USERS, DataItem.KEYCLOAK_USERS_GROUP -> {
-        config.getLong("keycloak.request.delay", 120000)
+        config.getLong("keycloak.request.delay", 50000)
       }
       else -> config.getLong("request.interval", 30000)
     }
 
   protected fun taskName(dataItem: DataItem) = dataItem.name.lowercase()
 
-  fun shutDown(dataItem: DataItem) {
+  fun shutDown(dataItem: DataItem, message: String? = null) {
     val sourceFile = this.taskName(dataItem)
-    logger.info(
-      "NOT SUPPORTED: Run command with the options --import (locations) --source-file ($sourceFile.csv)" +
-        " --users-file (users.csv)"
-    )
+    logger.info(message ?: "NOT SUPPORTED: Run command with the options --import (locations) --source-file ($sourceFile.csv)" +
+    " --users-file (users.csv)")
     vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
   }
 

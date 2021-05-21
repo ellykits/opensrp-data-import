@@ -19,15 +19,20 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
 
   protected val userIdsMap = TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
 
-  protected var requestInterval = 60000L
-
   override suspend fun start() {
     super.start()
-
-    requestInterval = getRequestInterval(DataItem.KEYCLOAK_USERS)
-
     baseUrl = config.getString("keycloak.rest.users.url", "")
     updateUserIds(userIdsMap)
+
+    val eventBus = vertx.eventBus()
+    eventBus.consumer<String>(EventBusAddress.OPENMRS_TASK_COMPLETE).handler {
+      when (DataItem.valueOf(it.body())) {
+        DataItem.KEYCLOAK_USERS -> {
+          eventBus.send(EventBusAddress.OPENMRS_KEYCLOAK_USERS_GROUP_ASSIGN, true)
+        }
+        else -> eventBus.send(EventBusAddress.APP_SHUTDOWN, true)
+      }
+    }
   }
 
   protected suspend fun assignUserToGroup(userId: String) {
@@ -67,7 +72,7 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
       if (userJson != null) {
         try {
           val keycloakUserId = userJson.getString(ID)
-          logger.info("Keycloak $username found")
+          logger.info("Keycloak username $username found")
           vertx.eventBus()
             .publish(EventBusAddress.USER_FOUND, JsonObject().put(USERNAME, username).put(ID, keycloakUserId))
         } catch (throwable: Throwable) {

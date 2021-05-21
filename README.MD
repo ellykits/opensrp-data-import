@@ -149,7 +149,7 @@ This tool will generate CSV files with the content of the data that has been pos
 | keycloak.realm | Keycloak Realm |
 | keycloak.user.username | Username for Keycloak User|
 | keycloak.user.password | Password for Keycloak User|
-| keycloak.request.interval | Interval between single keycloak requests |
+| single.request.interval | Interval between requests submitted one at a time |
 | keycloak.request.delay | Delay in time in milliseconds before keycloak makes another batch request. Default is 1 minute |
 | keycloak.rest.users.url | Get all Keycloak Users endpoint. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/users* |
 | keycloak.rest.users.count.url | Endpoint for counting Keycloak Users. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/users/count* |

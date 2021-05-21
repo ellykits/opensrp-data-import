@@ -20,5 +20,7 @@ object EventBusAddress {
   const val OPENMRS_TEAM_LOCATIONS_COUNT = "openmrs.team.locations.count"
   const val OPENMRS_USER_ROLE_COUNT = "openmrs.user.role.count"
   const val OPENMRS_USER_ROLE_LOAD = "openmrs.user.role.load"
+  const val OPENMRS_TASK_COMPLETE = "openmrs.task.complete"
+  const val OPENMRS_KEYCLOAK_USERS_GROUP_ASSIGN = "openmrs.keycloak.users.group.assign"
   const val OAUTH_TOKEN_RECEIVED = "oauth.token.received"
 }

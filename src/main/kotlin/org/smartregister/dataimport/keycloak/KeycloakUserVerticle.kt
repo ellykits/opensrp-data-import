@@ -11,6 +11,7 @@ import io.vertx.kotlin.coroutines.awaitEvent
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
+import org.smartregister.dataimport.openmrs.OpenMRSLocationVerticle
 import org.smartregister.dataimport.openmrs.OpenMRSUserVerticle
 import org.smartregister.dataimport.shared.*
 
@@ -26,35 +27,25 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
 
     if (loadFromOpenMRS) {
       getProviderGroupId()
-      vertx.deployVerticle(OpenMRSUserVerticle()).await()
+      deployVerticle(OpenMRSUserVerticle(), poolName = OPENMRS_USERS)
 
-      vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler {
+      vertx.eventBus().consumer<Boolean>(EventBusAddress.OPENMRS_KEYCLOAK_USERS_GROUP_ASSIGN).handler {
         // Assign users to 'Provider' group after creation
-        when (DataItem.valueOf(it.body())) {
-          DataItem.KEYCLOAK_USERS -> {
-            launch(vertx.dispatcher()) {
-              if (!config.getBoolean(SKIP_USER_GROUP, false)) assignUsersToProviderGroup()
-              else vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
-            }
-          }
-          else -> vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
-        }
+        if (it.body()) {
+          if (!config.getBoolean(SKIP_USER_GROUP, false))
+            launch(vertx.dispatcher()) { assignUsersToProviderGroup() }
+          else completeTask(dataItem = DataItem.KEYCLOAK_USERS_GROUP, ignored = true)
+        } else shutDown(dataItem = DataItem.KEYCLOAK_USERS, message = "Done!")
       }
-
       createUsersFromOpenMRS()
-
     } else {
       getProviderGroupId()
-      vertx.eventBus().consumer<JsonArray>(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD).handler {
-        launch(vertx.dispatcher()) {
-          getOrCreateUser(it.body())
-        }
+      vertx.eventBus().consumer<JsonArray>(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD).handler { message ->
+        launch(vertx.dispatcher()) { getOrCreateUser(message.body()) }
       }
 
-      vertx.eventBus().consumer<JsonArray>(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN).handler {
-        launch(vertx.dispatcher()) {
-          assignUsersToProviderGroup(it.body())
-        }
+      vertx.eventBus().consumer<JsonArray>(EventBusAddress.CSV_KEYCLOAK_USERS_GROUP_ASSIGN).handler { message ->
+        launch(vertx.dispatcher()) { assignUsersToProviderGroup(message.body()) }
       }
     }
   }
@@ -85,11 +76,9 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
         var offset = 0
         val count = countMessage.body()
         launch(vertx.dispatcher()) {
-          val task = taskName(DataItem.KEYCLOAK_USERS)
-          vertx.sharedData().getCounter(task).await().addAndGet(count.toLong()).await()
-          logger.info("TASK STARTED [$task]: Sending requests, interval ${requestInterval / 1000} seconds.")
+          startVertxCounter(DataItem.KEYCLOAK_USERS, count.toLong(), true)
           while (offset <= count) {
-            awaitEvent<Long> { vertx.setTimer(requestInterval, it) }
+            awaitEvent<Long> { vertx.setTimer(getRequestInterval(DataItem.KEYCLOAK_USERS), it) }
             val message = awaitResult<Message<JsonArray>> { handler ->
               vertx.eventBus().request(EventBusAddress.OPENMRS_USERS_LOAD, offset, handler)
             }
@@ -110,7 +99,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
         users.map { it as JsonObject }
           .forEach { payload ->
             //wait for specified number of times before making next request, default 1 second
-            awaitEvent<Long> { timer -> vertx.setTimer(keycloakRequestInterval, timer) }
+            awaitEvent<Long> { timer -> vertx.setTimer(singleRequestInterval, timer) }
             val existingUser = checkKeycloakUser(payload.getString(USERNAME))
             if (existingUser == null) {
               awaitResult<HttpResponse<Buffer>?> {
@@ -135,9 +124,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
                 }
                 checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS)
               }
-            } else {
-              checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS)
-            }
+            } else checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS)
           }
       } catch (throwable: Throwable) {
         logger.error("$concreteClassName::Error creating Keycloak User")
@@ -151,14 +138,12 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
     try {
       users.forEach {
         //wait for specified number of times before making next request, default 1 second
-        awaitEvent<Long> { timer -> vertx.setTimer(keycloakRequestInterval, timer) }
+        awaitEvent<Long> { timer -> vertx.setTimer(singleRequestInterval, timer) }
         if (it is String) {
           val user = userIdsMap[it]
-          if (user != null) {
-            assignUserToGroup(user)
-          } else { // Ignore any missing and continue count down
-            checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUP)
-          }
+          // Ignore any missing and continue count down
+          if (user == null) checkTaskCompletion(counter, DataItem.KEYCLOAK_USERS_GROUP)
+          else assignUserToGroup(user)
         }
       }
     } catch (throwable: Throwable) {
@@ -171,7 +156,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
     try {
       userIdsMap.forEach {
         //wait for specified number of times before making next request, default 1 second
-        awaitEvent<Long> { timer -> vertx.setTimer(keycloakRequestInterval, timer) }
+        awaitEvent<Long> { timer -> vertx.setTimer(singleRequestInterval, timer) }
         assignUserToGroup(it.value)
       }
     } catch (throwable: Throwable) {

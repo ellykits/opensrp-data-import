@@ -10,6 +10,7 @@ import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
+import org.smartregister.dataimport.openmrs.OpenMRSLocationVerticle
 import org.smartregister.dataimport.shared.*
 import kotlin.math.ceil
 
@@ -49,8 +50,15 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
         }
       }
     }
-    eventBus.consumer<String>(EventBusAddress.TASK_COMPLETE).handler {
-      eventBus.send(EventBusAddress.APP_SHUTDOWN, true)
+
+    eventBus.consumer<String>(EventBusAddress.OPENMRS_TASK_COMPLETE).handler {
+      when (DataItem.valueOf(it.body())) {
+        DataItem.LOCATION_TAGS -> launch(vertx.dispatcher()) {
+          deployVerticle(OpenMRSLocationVerticle(), poolName = OPENMRS_LOCATIONS)
+        }
+        DataItem.KEYCLOAK_USERS -> vertx.eventBus().send(EventBusAddress.OPENMRS_KEYCLOAK_USERS_GROUP_ASSIGN, true)
+        else -> eventBus.send(EventBusAddress.APP_SHUTDOWN, true)
+      }
     }
   }
 

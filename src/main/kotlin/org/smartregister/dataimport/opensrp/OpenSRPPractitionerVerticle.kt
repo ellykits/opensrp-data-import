@@ -36,13 +36,14 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
 
       if (countResponse != null) {
         val userCount = countResponse.bodyAsString().toLong()
-        vertx.setPeriodic(config.getLong("keycloak.request.interval", 1000)) { timeId ->
-          if (queryParameters.getValue(FIRST).toLong() >= userCount) {
-            logger.info("Completed fetching ${userIdsMap.size} users from keycloak")
-            vertx.deployVerticle(OpenMRSUserVerticle())
-            vertx.cancelTimer(timeId)
-          }
+        vertx.setPeriodic(config.getLong("single.request.interval", 1000)) { timeId ->
           launch(vertx.dispatcher()) {
+            if (queryParameters.getValue(FIRST).toLong() >= userCount) {
+              logger.info("Completed fetching ${userIdsMap.size} users from keycloak")
+              deployVerticle(OpenMRSUserVerticle(), OPENMRS_USERS)
+              vertx.cancelTimer(timeId)
+            }
+
             logger.info("Current offset: ${queryParameters[FIRST]} and limit: $limit")
             val usersResponse = awaitResult<HttpResponse<Buffer>?> {
               webRequest(

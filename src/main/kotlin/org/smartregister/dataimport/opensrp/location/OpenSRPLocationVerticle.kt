@@ -14,7 +14,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.smartregister.dataimport.openmrs.OpenMRSLocationVerticle
 import org.smartregister.dataimport.opensrp.BaseOpenSRPVerticle
 import org.smartregister.dataimport.shared.*
 import org.smartregister.dataimport.shared.model.*
@@ -55,8 +54,6 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
     sourceFile = config.getString(SOURCE_FILE)
 
-    consumeDataFromSources()
-
     try {
       if (sourceFile.isNullOrBlank()) {
         consumeOpenMRSData(
@@ -66,6 +63,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           action = this::postLocations
         )
       } else {
+        consumeDataFromSources()
         val usersFile = config.getString(USERS_FILE, "")
         if (!usersFile.isNullOrBlank()) {
           extractUsersFromCSV(usersFile)
@@ -84,11 +82,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     try {
       vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler { message ->
         when (DataItem.valueOf(message.body())) {
-          DataItem.LOCATION_TAGS ->
-            launch(vertx.dispatcher()) {
-              if (sourceFile.isNullOrBlank()) vertx.deployVerticle(OpenMRSLocationVerticle())
-              else extractLocationsFromCSV(sourceFile)
-            }
+          DataItem.LOCATION_TAGS -> launch(vertx.dispatcher()) { extractLocationsFromCSV(sourceFile) }
           DataItem.LOCATIONS -> {
             val organizationsChunked = organizations.chunked(limit)
             consumeCSVData(organizationsChunked, DataItem.ORGANIZATIONS) {

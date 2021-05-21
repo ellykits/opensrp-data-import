@@ -51,10 +51,10 @@ class MainVerticle : BaseVerticle() {
             when (DataItem.valueOf(choice.uppercase())) {
               DataItem.LOCATIONS -> deployVerticle(OpenSRPLocationVerticle(), poolName = choice)
               DataItem.ORGANIZATIONS -> deployVerticle(OpenSRPOrganizationVerticle(), poolName = choice)
-              DataItem.PRACTITIONERS -> deployVerticle(OpenSRPPractitionerVerticle(), poolName = choice)
-              DataItem.KEYCLOAK_USERS -> deployVerticle(KeycloakUserVerticle(), poolName = choice)
               DataItem.ORGANIZATION_LOCATIONS ->
                 deployVerticle(OpenSRPOrganizationLocationVerticle(), poolName = choice)
+              DataItem.KEYCLOAK_USERS -> deployVerticle(KeycloakUserVerticle(), poolName = choice)
+              DataItem.PRACTITIONERS -> deployVerticle(OpenSRPPractitionerVerticle(), poolName = choice)
               DataItem.PRACTITIONER_ROLES -> deployVerticle(OpenSRPPractitionerRoleVerticle(), poolName = choice)
               else -> {
                 logger.warn("Operation not supported")
