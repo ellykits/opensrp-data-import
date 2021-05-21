@@ -38,10 +38,10 @@ class MainVerticle : BaseVerticle() {
         if (message.body()) {
           val choice = config.getString(IMPORT_OPTION)
 
-          deployVerticle(CsvGeneratorVerticle())
+          val csvVerticleId = deployVerticle(CsvGeneratorVerticle())
 
           val verticleConfigs = commonConfigs()
-          if (choice != null) {
+          if (choice != null && !csvVerticleId.isNullOrBlank()) {
             when (DataItem.valueOf(choice.uppercase())) {
               DataItem.LOCATIONS -> deployVerticle(OpenSRPLocationTagVerticle(), verticleConfigs)
               DataItem.ORGANIZATIONS -> deployVerticle(OpenSRPOrganizationVerticle(), verticleConfigs)
@@ -55,7 +55,8 @@ class MainVerticle : BaseVerticle() {
               }
             }
           } else {
-            logger.error("Nothing to deploy")
+            logger.error("Nothing to deploy or error deploying common verticles. Try again.")
+            vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
           }
         }
       }
