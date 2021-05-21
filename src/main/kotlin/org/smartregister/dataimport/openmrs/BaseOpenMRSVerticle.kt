@@ -5,6 +5,7 @@ import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
 import io.vertx.core.tracing.TracingPolicy
 import io.vertx.kotlin.coroutines.await
+import io.vertx.kotlin.coroutines.dispatcher
 import io.vertx.mysqlclient.MySQLConnectOptions
 import io.vertx.mysqlclient.MySQLPool
 import io.vertx.sqlclient.PoolOptions
@@ -73,7 +74,7 @@ abstract class BaseOpenMRSVerticle : BaseVerticle() {
     pool.getConnection { connection ->
       if (connection.succeeded()) {
         val sqlConnection = connection.result()
-        launch {
+        launch(vertx.dispatcher()) {
           try {
             val rowSet = sqlConnection.query(query).execute().await()
             if (rowSet.size() > 0) {

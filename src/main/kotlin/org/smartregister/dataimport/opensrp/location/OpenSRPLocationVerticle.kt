@@ -9,10 +9,11 @@ import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpResponse
 import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
+import io.vertx.kotlin.coroutines.dispatcher
+import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.smartregister.dataimport.keycloak.KeycloakUserVerticle
 import org.smartregister.dataimport.openmrs.OpenMRSLocationVerticle
 import org.smartregister.dataimport.opensrp.BaseOpenSRPVerticle
 import org.smartregister.dataimport.shared.*
@@ -47,45 +48,47 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   private var locationOrganizationMap = mapOf<String, OrganizationLocation>()
 
+  var sourceFile: String? = null
+
   override suspend fun start() {
     super.start()
 
-    val sourceFile = config.getString(SOURCE_FILE)
+    sourceFile = config.getString(SOURCE_FILE)
 
-    if (sourceFile.isNullOrBlank()) {
-      vertx.deployVerticle(OpenMRSLocationVerticle())
-      consumeOpenMRSData(
-        dataItem = DataItem.LOCATIONS,
-        countAddress = EventBusAddress.OPENMRS_LOCATIONS_COUNT,
-        loadAddress = EventBusAddress.OPENMRS_LOCATIONS_LOAD,
-        action = this::postLocations
-      )
-    } else {
-      try {
+    consumeDataFromSources()
+
+    try {
+      if (sourceFile.isNullOrBlank()) {
+        consumeOpenMRSData(
+          dataItem = DataItem.LOCATIONS,
+          countAddress = EventBusAddress.OPENMRS_LOCATIONS_COUNT,
+          loadAddress = EventBusAddress.OPENMRS_LOCATIONS_LOAD,
+          action = this::postLocations
+        )
+      } else {
         val usersFile = config.getString(USERS_FILE, "")
-        if (!usersFile.isNullOrBlank()) extractUsersFromCSV(usersFile)
-
-        val verticleId = deployVerticle(KeycloakUserVerticle(), commonConfigs())
-
-        if (!verticleId.isNullOrBlank()) {
-          extractLocationsFromCSV(sourceFile)
-          cascadeDataImportation()
+        if (!usersFile.isNullOrBlank()) {
+          extractUsersFromCSV(usersFile)
           updateUserIds(userIdsMap)
-        } else {
-          logger.error("Error deploying KeycloakUserVerticle. Retry again...")
-          vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
         }
-
-      } catch (throwable: Throwable) {
-        vertx.exceptionHandler().handle(throwable)
       }
+
+      deployVerticle(OpenSRPLocationTagVerticle(), poolName = DataItem.LOCATION_TAGS.name.lowercase())
+
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
     }
   }
 
-  private fun cascadeDataImportation() {
+  private fun consumeDataFromSources() {
     try {
       vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler { message ->
         when (DataItem.valueOf(message.body())) {
+          DataItem.LOCATION_TAGS ->
+            launch(vertx.dispatcher()) {
+              if (sourceFile.isNullOrBlank()) vertx.deployVerticle(OpenMRSLocationVerticle())
+              else extractLocationsFromCSV(sourceFile)
+            }
           DataItem.LOCATIONS -> {
             val organizationsChunked = organizations.chunked(limit)
             consumeCSVData(organizationsChunked, DataItem.ORGANIZATIONS) {
@@ -148,7 +151,6 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
             logger.warn("DONE: OpenSRP Data Import completed...sending request to shutdown)")
             vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
           }
-          else -> vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
         }
       }
     } catch (throwable: Throwable) {
@@ -274,7 +276,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           if (it.assignTeam && !generateTeams.isNullOrBlank()) {
             generateOrganizations(it)
           }
-        }.filter { it.isNew }.chunked(limit)
+        }.filter { if (config.getBoolean(OVERWRITE, false)) !it.isNew else it.isNew }.chunked(limit)
 
         //Associate location to organization for future mapping with practitioners
         locationOrganizationMap = organizationLocations.filterNot { it.jurisdiction == null }

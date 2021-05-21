@@ -25,7 +25,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
     loadFromOpenMRS = config.getString(SOURCE_FILE, "").isNullOrBlank()
 
     if (loadFromOpenMRS) {
-
+      getProviderGroupId()
       vertx.deployVerticle(OpenMRSUserVerticle()).await()
 
       vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler {
@@ -44,6 +44,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
       createUsersFromOpenMRS()
 
     } else {
+      getProviderGroupId()
       vertx.eventBus().consumer<JsonArray>(EventBusAddress.CSV_KEYCLOAK_USERS_LOAD).handler {
         launch(vertx.dispatcher()) {
           getOrCreateUser(it.body())
@@ -58,14 +59,35 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
     }
   }
 
+  private suspend fun getProviderGroupId() {
+    try {
+      val groupResponse =
+        awaitResult<HttpResponse<Buffer>?> {
+          webRequest(
+            method = HttpMethod.GET,
+            url = config.getString("keycloak.rest.groups.url"),
+            handler = it
+          )
+        }
+
+      if (groupResponse != null) {
+        providerGroupId = groupResponse.bodyAsJsonArray().map { it as JsonObject }
+          .find { it.getString(NAME).equals(PROVIDER, true) }?.getString(ID)
+      }
+    } catch (throwable: Throwable) {
+      vertx.exceptionHandler().handle(throwable)
+    }
+  }
+
   private fun createUsersFromOpenMRS() {
     vertx.eventBus().consumer<Int>(EventBusAddress.OPENMRS_USERS_COUNT).handler { countMessage ->
       try {
         var offset = 0
         val count = countMessage.body()
         launch(vertx.dispatcher()) {
-          vertx.sharedData().getCounter(DataItem.KEYCLOAK_USERS.name).await().addAndGet(count.toLong()).await()
-          logger.info("TASK STARTED: Sending requests, interval ${requestInterval / 1000} seconds.")
+          val task = taskName(DataItem.KEYCLOAK_USERS)
+          vertx.sharedData().getCounter(task).await().addAndGet(count.toLong()).await()
+          logger.info("TASK STARTED [$task]: Sending requests, interval ${requestInterval / 1000} seconds.")
           while (offset <= count) {
             awaitEvent<Long> { vertx.setTimer(requestInterval, it) }
             val message = awaitResult<Message<JsonArray>> { handler ->

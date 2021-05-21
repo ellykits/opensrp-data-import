@@ -13,7 +13,7 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
 
   private lateinit var baseUrl: String
 
-  private var providerGroupId: String? = null
+  protected var providerGroupId: String? = null
 
   protected var loadFromOpenMRS: Boolean = false
 
@@ -27,21 +27,6 @@ abstract class BaseKeycloakVerticle : BaseVerticle() {
     requestInterval = getRequestInterval(DataItem.KEYCLOAK_USERS)
 
     baseUrl = config.getString("keycloak.rest.users.url", "")
-
-    val groupResponse =
-      awaitResult<HttpResponse<Buffer>?> {
-        webRequest(
-          method = HttpMethod.GET,
-          url = config.getString("keycloak.rest.groups.url"),
-          handler = it
-        )
-      }
-
-    if (groupResponse != null) {
-      providerGroupId = groupResponse.bodyAsJsonArray().map { it as JsonObject }
-        .find { it.getString(NAME).equals(PROVIDER, true) }?.getString(ID)
-    }
-
     updateUserIds(userIdsMap)
   }
 

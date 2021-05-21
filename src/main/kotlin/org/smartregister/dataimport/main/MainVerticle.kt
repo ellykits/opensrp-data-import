@@ -6,11 +6,8 @@ import kotlinx.coroutines.launch
 import org.smartregister.dataimport.csv.CsvGeneratorVerticle
 import org.smartregister.dataimport.keycloak.KeycloakUserVerticle
 import org.smartregister.dataimport.opensrp.*
-import org.smartregister.dataimport.opensrp.location.OpenSRPLocationTagVerticle
-import org.smartregister.dataimport.shared.BaseVerticle
-import org.smartregister.dataimport.shared.DataItem
-import org.smartregister.dataimport.shared.EventBusAddress
-import org.smartregister.dataimport.shared.IMPORT_OPTION
+import org.smartregister.dataimport.opensrp.location.OpenSRPLocationVerticle
+import org.smartregister.dataimport.shared.*
 
 /**
  * This is the MainVerticle that is used to deploy other verticles. The [OpenSRPAuthVerticle] needs to be deployed first
@@ -38,20 +35,30 @@ class MainVerticle : BaseVerticle() {
         if (message.body()) {
           val choice = config.getString(IMPORT_OPTION)
 
-          val csvVerticleId = deployVerticle(CsvGeneratorVerticle())
+          val csvVerticleId = deployVerticle(CsvGeneratorVerticle(), poolName = CSV_GENERATOR)
 
-          val verticleConfigs = commonConfigs()
           if (choice != null && !csvVerticleId.isNullOrBlank()) {
+
+            //Start keycloak service for CSV data sources
+            if (!config.getString(SOURCE_FILE, "").isNullOrBlank()) {
+              val keycloakVerticleId = deployVerticle(KeycloakUserVerticle(), DataItem.KEYCLOAK_USERS.name.lowercase())
+              if (keycloakVerticleId.isNullOrBlank()) {
+                logger.warn("Keycloak service not deployed successfully. Retry again.")
+                vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
+              }
+            }
+
             when (DataItem.valueOf(choice.uppercase())) {
-              DataItem.LOCATIONS -> deployVerticle(OpenSRPLocationTagVerticle(), verticleConfigs)
-              DataItem.ORGANIZATIONS -> deployVerticle(OpenSRPOrganizationVerticle(), verticleConfigs)
-              DataItem.PRACTITIONERS -> deployVerticle(OpenSRPPractitionerVerticle(), verticleConfigs)
-              DataItem.KEYCLOAK_USERS -> deployVerticle(KeycloakUserVerticle(), verticleConfigs)
-              DataItem.ORGANIZATION_LOCATIONS -> deployVerticle(OpenSRPOrganizationLocationVerticle(), verticleConfigs)
-              DataItem.PRACTITIONER_ROLES -> deployVerticle(OpenSRPPractitionerRoleVerticle(), verticleConfigs)
+              DataItem.LOCATIONS -> deployVerticle(OpenSRPLocationVerticle(), poolName = choice)
+              DataItem.ORGANIZATIONS -> deployVerticle(OpenSRPOrganizationVerticle(), poolName = choice)
+              DataItem.PRACTITIONERS -> deployVerticle(OpenSRPPractitionerVerticle(), poolName = choice)
+              DataItem.KEYCLOAK_USERS -> deployVerticle(KeycloakUserVerticle(), poolName = choice)
+              DataItem.ORGANIZATION_LOCATIONS ->
+                deployVerticle(OpenSRPOrganizationLocationVerticle(), poolName = choice)
+              DataItem.PRACTITIONER_ROLES -> deployVerticle(OpenSRPPractitionerRoleVerticle(), poolName = choice)
               else -> {
                 logger.warn("Operation not supported")
-                vertx.close()
+                vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
               }
             }
           } else {

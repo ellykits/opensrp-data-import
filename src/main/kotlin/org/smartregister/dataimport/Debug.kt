@@ -4,10 +4,7 @@ import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.core.deploymentOptionsOf
 import org.smartregister.dataimport.main.MainVerticle
-import org.smartregister.dataimport.shared.GENERATE_TEAMS
-import org.smartregister.dataimport.shared.IMPORT_OPTION
-import org.smartregister.dataimport.shared.SOURCE_FILE
-import org.smartregister.dataimport.shared.USERS_FILE
+import org.smartregister.dataimport.shared.*
 
 /**
  * Main function for debugging the application in the IDE. Uncomment any of the options to debug or set required system
@@ -21,8 +18,8 @@ fun main() {
     put(IMPORT_OPTION, "locations")
     put(SOURCE_FILE, "assets/locations.csv")
     put(USERS_FILE, "assets/users.csv")
-//    put(SKIP_USER_GROUP, true)
-//    put(SKIP_LOCATION_TAGS, true)
+    put(SKIP_USER_GROUP, true)
+    put(SKIP_LOCATION_TAGS, true)
 //    put(SKIP_LOCATIONS, true)
     put(GENERATE_TEAMS, "Health Facility")
   }

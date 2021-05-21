@@ -28,6 +28,10 @@ class Application : CliktCommand(name = "opensrp-data-import") {
     names = arrayOf("--source-file", "-s")
   )
 
+  private val overwrite: Boolean by option(
+    help = "Overwrite existing locations", names = arrayOf("--overwrite", "-oW")
+  ).flag(default = false)
+
   private val generateTeams: String? by option(
     help = "Indicate the location level for team assignment", names = arrayOf("--assign-team", "-aT")
   )
@@ -89,9 +93,9 @@ class Application : CliktCommand(name = "opensrp-data-import") {
         put(SOURCE_FILE, sourceFile)
         put(USERS_FILE, usersFile)
         put(SKIP_LOCATION_TAGS, skipLocationTags)
-        put(SKIP_LOCATIONS, skipLocations)
         put(SKIP_USER_GROUP, skipUserGroup)
         put(GENERATE_TEAMS, generateTeams)
+        put(OVERWRITE, overwrite)
       }
 
       vertx.deployVerticle(mainVerticle, deploymentOptionsOf(config = configs))
