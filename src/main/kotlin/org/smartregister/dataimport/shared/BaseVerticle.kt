@@ -94,7 +94,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       maximumRetries = config.getInteger("circuit.breaker.max.retries", 10)
       workerPoolSize = config.getInteger("worker.pool.size", 10)
       requestTimeout = config.getLong("request.timeout", -1)
-      keycloakRequestInterval = config.getLong("keycloak.request.interval", 1500)
+      keycloakRequestInterval = config.getLong("keycloak.request.interval", 1000)
       val resetTimeout = config.getLong("reset.timeout", 5000)
 
       val circuitBreakerOptions = circuitBreakerOptionsOf(
