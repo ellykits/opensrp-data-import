@@ -126,7 +126,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
     }
   }
 
-  protected suspend fun deployVerticle(verticle: BaseVerticle, configs: JsonObject = JsonObject()) {
+  protected suspend fun deployVerticle(verticle: BaseVerticle, configs: JsonObject = JsonObject()): String? {
     try {
       val deploymentId = vertx.deployVerticle(
         verticle, deploymentOptionsOf(
@@ -137,8 +137,10 @@ abstract class BaseVerticle : CoroutineVerticle() {
         )
       ).await()
       deployedVerticleIds.add(deploymentId)
+      return deploymentId
     } catch (throwable: Throwable) {
       vertx.exceptionHandler().handle(throwable)
+      return null
     }
   }
 

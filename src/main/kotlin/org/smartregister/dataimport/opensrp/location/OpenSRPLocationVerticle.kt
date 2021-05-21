@@ -63,19 +63,19 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     } else {
       try {
         val usersFile = config.getString(USERS_FILE, "")
+        if (!usersFile.isNullOrBlank()) extractUsersFromCSV(usersFile)
 
-        if (!usersFile.isNullOrBlank()) {
-          extractUsersFromCSV(usersFile)
-          deployVerticle(KeycloakUserVerticle(), commonConfigs())
+        val verticleId = deployVerticle(KeycloakUserVerticle(), commonConfigs())
+
+        if (!verticleId.isNullOrBlank()) {
+          extractLocationsFromCSV(sourceFile)
+          cascadeDataImportation()
+          updateUserIds(userIdsMap)
+        } else {
+          logger.error("Error deploying KeycloakUserVerticle. Retry again...")
+          vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
         }
 
-        extractLocationsFromCSV(sourceFile)
-
-        //Begin by posting locations from CSV, then organization, map organizations to locations, post keycloak users,
-        // create practitioners and finally assign practitioners to organizations
-        cascadeDataImportation()
-
-        updateUserIds(userIdsMap)
       } catch (throwable: Throwable) {
         vertx.exceptionHandler().handle(throwable)
       }
