@@ -6,12 +6,14 @@ import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpResponse
 import io.vertx.kotlin.coroutines.await
+import io.vertx.kotlin.coroutines.awaitEvent
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
 import org.smartregister.dataimport.openmrs.OpenMRSUserVerticle
 import org.smartregister.dataimport.shared.*
 import java.util.*
+import kotlin.math.ceil
 
 /**
  * Subclass of [BaseOpenSRPVerticle] responsible for posting OpenSRP practitioners
@@ -36,30 +38,36 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
 
       if (countResponse != null) {
         val userCount = countResponse.bodyAsString().toLong()
-        vertx.setPeriodic(config.getLong("single.request.interval", 1000)) { timeId ->
-          launch(vertx.dispatcher()) {
-            if (queryParameters.getValue(FIRST).toLong() >= userCount) {
-              logger.info("Completed fetching ${userIdsMap.size} users from keycloak")
-              deployVerticle(OpenMRSUserVerticle(), OPENMRS_USERS)
-              vertx.cancelTimer(timeId)
-            }
+        var offset = 0
+        val numberOfRequests = ceil(userCount.toDouble().div(limit.toDouble())).toLong()
+        launch(vertx.dispatcher()) {
+          try {
+            val vertxCounter = vertx.sharedData().getCounter(KEYCLOAK_FETCH_USERS).await()
+            vertxCounter.addAndGet(numberOfRequests)
+            while (offset <= userCount) {
+              awaitEvent<Long> { vertx.setTimer(singleRequestInterval, it) }
+              logger.info("KEYCLOAK: Fetching user first: ${queryParameters[FIRST]}, max: $limit")
+              val usersResponse = awaitResult<HttpResponse<Buffer>?> {
+                webRequest(
+                  method = HttpMethod.GET,
+                  queryParams = queryParameters,
+                  url = baseUrl,
+                  handler = it
+                )
+              }
+              usersResponse?.bodyAsJsonArray()?.map { it as JsonObject }?.forEach {
+                userIdsMap[it.getString(USERNAME)] = it.getString(ID)
+              }
+              offset += limit
+              queryParameters[FIRST] = offset.toString()
 
-            logger.info("Current offset: ${queryParameters[FIRST]} and limit: $limit")
-            val usersResponse = awaitResult<HttpResponse<Buffer>?> {
-              webRequest(
-                method = HttpMethod.GET,
-                queryParams = queryParameters,
-                url = baseUrl,
-                handler = it
-              )
+              usersFetched()
             }
-            usersResponse?.bodyAsJsonArray()?.map { it as JsonObject }?.forEach {
-              userIdsMap[it.getString(USERNAME)] = it.getString(ID)
-            }
-            queryParameters[FIRST] = (queryParameters.getValue(FIRST).toLong() + limit).toString()
+          } catch (throwable: Throwable) {
+            vertx.exceptionHandler().handle(throwable)
           }
         }
-      }
+      } else shutDown(dataItem = DataItem.PRACTITIONERS, message = "KEYCLOAK: Cannot retrieve total number of users")
 
       consumeOpenMRSData(
         dataItem = DataItem.PRACTITIONERS,
@@ -70,12 +78,16 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
 
       //Watch for any updates on user id
       updateUserIds(userIdsMap)
-    } else {
-      shutDown(DataItem.PRACTITIONERS)
-    }
+    } else shutDown(DataItem.PRACTITIONERS)
+  }
+
+  private suspend fun usersFetched() {
+    val currentCount = vertx.sharedData().getCounter(KEYCLOAK_FETCH_USERS).await().run { decrementAndGet() }.await()
+    if (currentCount == 0L) deployVerticle(OpenMRSUserVerticle(), OPENMRS_USERS)
   }
 
   private suspend fun createPractitioners(practitioners: JsonArray) {
+    val counter = vertx.sharedData().getCounter(DataItem.PRACTITIONERS.name).await()
     val practitionerList: JsonArray = practitioners.onEach {
       if (it is JsonObject) {
         it.put(USER_ID, userIdsMap[it.getString(USERNAME)])
@@ -89,9 +101,7 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
       webRequest(url = config.getString("opensrp.rest.practitioner.url"), payload = practitionerList, handler = it)
     }?.run {
       logHttpResponse()
-      val counter = vertx.sharedData().getCounter(DataItem.PRACTITIONERS.name).await()
       checkTaskCompletion(counter, DataItem.PRACTITIONERS)
     }
   }
-
 }
