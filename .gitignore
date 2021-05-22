@@ -188,3 +188,4 @@ build
 
 conf/application.properties
 assets/
+logs/
