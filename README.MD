@@ -59,6 +59,8 @@ Set  the value for `location.hierarchy` config with location tags from OpenMRS i
 
 --skip-location-tags or -sT (optional) : Skip importing location tags
 
+--overwrite (optional) or -oW: Override the existing locations whose IDs are provided
+
 ```
 
 For example run the following command to list available options (`app.properties` is name of the file containing configurations for the app)
@@ -96,6 +98,8 @@ java -jar opensrp-data-import-2.0.2-SNAPSHOT-fat.jar --configs-file app.properti
 --skip-locations or -sL (optional) : Skip importing locations (just import location tags)
 
 --skip-user-group or -sG (optional) : Skip adding Keycloak assigning users to Provider group
+
+--overwrite (optional) or -oW: Override the existing locations whose IDs are provided
 
 ```
 
