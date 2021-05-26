@@ -15,7 +15,7 @@ import org.smartregister.dataimport.shared.*
 
 fun main() {
   val configs = JsonObject().apply {
-    put(IMPORT_OPTION, "practitioners")
+    put(IMPORT_OPTION, "locations")
 //    put(SOURCE_FILE, "assets/locations.csv")
 //    put(USERS_FILE, "assets/users.csv")
 //    put(SKIP_USER_GROUP, true)
