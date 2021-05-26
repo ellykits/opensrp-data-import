@@ -75,6 +75,8 @@ java -jar opensrp-data-import-2.0.3-SNAPSHOT-fat.jar --configs-file app.properti
 
 You can find sample google sheet that you can download as CSV here [Locations and Users](https://docs.google.com/spreadsheets/d/1QQwfOy-Tp3I9_eXEpTyVV1CLo4SrTAPl_p2cfSm0sDc/edit?usp=sharing)
 
+>NOTE: Sample CSV is READ ONLY you can save a copy and edit as desired.
+
 #### Prerequisites
 - Internet connection - The web client needs this to communicate to OpenSRP
 - Keycloak users MUST have roles to view/edit other keycloak users (This is a composite Role that can be added to other existing user roles)
