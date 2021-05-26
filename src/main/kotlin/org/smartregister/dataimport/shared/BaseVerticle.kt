@@ -32,8 +32,8 @@ import io.vertx.kotlin.ext.web.client.webClientOptionsOf
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import java.io.FileNotFoundException
 import java.io.FileReader
 import java.io.FileWriter
@@ -55,7 +55,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected val deployedVerticleIds = mutableSetOf<String>()
 
-  protected val logger: Logger = LoggerFactory.getLogger(this::class.java)
+  protected val logger: Logger = LogManager.getLogger(this::class.java)
 
   protected var limit = 50
 

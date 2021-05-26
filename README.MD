@@ -67,7 +67,7 @@ For example run the following command to list available options (`app.properties
 
 ```shell script
 
-java -jar opensrp-data-import-2.0.2-SNAPSHOT-fat.jar --configs-file app.properties  --help
+java -jar opensrp-data-import-2.0.3-SNAPSHOT-fat.jar --configs-file app.properties  --help
 
 ```
 
@@ -107,7 +107,7 @@ java -jar opensrp-data-import-2.0.2-SNAPSHOT-fat.jar --configs-file app.properti
 
 ```shell script
 
-java -jar opensrp-data-import-2.0.2-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
+java -jar opensrp-data-import-2.0.3-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
 
 ```
 
