@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "org.smartregister"
-version = "2.0.2-SNAPSHOT"
+version = "2.0.3-SNAPSHOT"
 
 repositories {
   mavenCentral()
@@ -30,7 +30,7 @@ application {
 val vertxVersion = "4.0.2"
 val junitJupiterVersion = "5.7.0"
 val kotlinSerializationVersion = "1.2.0"
-val logbackVersion = "1.2.3"
+val log4jVersion = "2.14.1"
 val cliktVersion = "3.1.0"
 val openCsvVersion = "5.4"
 
@@ -46,7 +46,7 @@ dependencies {
   implementation("io.vertx:vertx-config")
   implementation("io.vertx:vertx-circuit-breaker")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinSerializationVersion")
-  implementation("ch.qos.logback:logback-classic:$logbackVersion")
+  implementation("org.apache.logging.log4j:log4j-core:$log4jVersion")
   implementation("com.github.ajalt.clikt:clikt:$cliktVersion")
   implementation("com.opencsv:opencsv:$openCsvVersion")
 
@@ -89,7 +89,7 @@ tasks.withType<JavaExec> {
     "--redeploy=$watchForChange",
     "--launcher-class=$launcherClassName",
     "--on-redeploy=$doOnChange",
-    "-Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.SLF4JLogDelegateFactory",
+    "-Dvertx.logger-delegate-factory-class-name=Log4j2LogDelegateFactory",
     "-Denvironment=dev"
   )
 }

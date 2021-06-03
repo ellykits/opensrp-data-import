@@ -59,17 +59,23 @@ Set  the value for `location.hierarchy` config with location tags from OpenMRS i
 
 --skip-location-tags or -sT (optional) : Skip importing location tags
 
+--overwrite (optional) or -oW: Override the existing locations whose IDs are provided
+
 ```
 
 For example run the following command to list available options (`app.properties` is name of the file containing configurations for the app)
 
 ```shell script
 
-java -jar opensrp-data-import-2.0.2-SNAPSHOT-fat.jar --configs-file app.properties  --help
+java -jar opensrp-data-import-2.0.3-SNAPSHOT-fat.jar --configs-file app.properties  --help
 
 ```
 
 ### Import data from CSV file
+
+You can find sample google sheet that you can download as CSV here [Locations and Users](https://docs.google.com/spreadsheets/d/1QQwfOy-Tp3I9_eXEpTyVV1CLo4SrTAPl_p2cfSm0sDc/edit?usp=sharing)
+
+>NOTE: Sample CSV is READ ONLY you can save a copy and edit as desired.
 
 #### Prerequisites
 - Internet connection - The web client needs this to communicate to OpenSRP
@@ -97,13 +103,15 @@ java -jar opensrp-data-import-2.0.2-SNAPSHOT-fat.jar --configs-file app.properti
 
 --skip-user-group or -sG (optional) : Skip adding Keycloak assigning users to Provider group
 
+--overwrite (optional) or -oW: Override the existing locations whose IDs are provided
+
 ```
 
 ***Example:**  Run the following command to import locations, migrate keycloak users, create team at the "Health Facility" and add the users to the created teams.*
 
 ```shell script
 
-java -jar opensrp-data-import-2.0.2-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
+java -jar opensrp-data-import-2.0.3-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
 
 ```
 
