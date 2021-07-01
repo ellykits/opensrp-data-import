@@ -93,6 +93,7 @@ class Application : CliktCommand(name = "opensrp-data-import") {
         put(SOURCE_FILE, sourceFile)
         put(USERS_FILE, usersFile)
         put(SKIP_LOCATION_TAGS, skipLocationTags)
+        put(SKIP_LOCATIONS, skipLocations)
         put(SKIP_USER_GROUP, skipUserGroup)
         put(GENERATE_TEAMS, generateTeams)
         put(OVERWRITE, overwrite)
