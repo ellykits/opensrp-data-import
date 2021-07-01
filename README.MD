@@ -67,7 +67,7 @@ For example run the following command to list available options (`app.properties
 
 ```shell script
 
-java -jar opensrp-data-import-2.0.3-SNAPSHOT-fat.jar --configs-file app.properties  --help
+java -jar opensrp-data-import-2.0.4-SNAPSHOT-fat.jar --configs-file app.properties  --help
 
 ```
 
@@ -111,7 +111,7 @@ You can find sample google sheet that you can download as CSV here [Locations an
 
 ```shell script
 
-java -jar opensrp-data-import-2.0.3-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
+java -jar opensrp-data-import-2.0.4-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
 
 ```
 
