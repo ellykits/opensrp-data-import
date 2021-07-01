@@ -224,6 +224,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       put(SOURCE_FILE, config.getString(SOURCE_FILE, ""))
       put(USERS_FILE, config.getString(USERS_FILE, ""))
       put(SKIP_LOCATION_TAGS, config.getBoolean(SKIP_LOCATION_TAGS, false))
+      put(SKIP_LOCATIONS, config.getBoolean(SKIP_LOCATIONS, false))
       put(SKIP_USER_GROUP, config.getBoolean(SKIP_USER_GROUP, false))
       put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, ""))
     }

@@ -279,7 +279,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         promise.complete(newLocations)
       }.await()
 
-      val skipLocations = config.getBoolean(SKIP_LOCATIONS)
+      val skipLocations = config.getBoolean(SKIP_LOCATIONS, false)
       if (skipLocations) {
         completeTask(dataItem = DataItem.LOCATIONS, ignored = true)
       } else {
