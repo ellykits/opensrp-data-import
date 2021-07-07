@@ -279,8 +279,13 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         promise.complete(newLocations)
       }.await()
 
-      consumeCSVData(csvData = locationsData, DataItem.LOCATIONS) {
-        postData(config.getString("opensrp.rest.location.url"), it, DataItem.LOCATIONS)
+      val skipLocations = config.getBoolean(SKIP_LOCATIONS, false)
+      if (skipLocations) {
+        completeTask(dataItem = DataItem.LOCATIONS, ignored = true)
+      } else {
+        consumeCSVData(csvData = locationsData, DataItem.LOCATIONS) {
+          postData(config.getString("opensrp.rest.location.url"), it, DataItem.LOCATIONS)
+        }
       }
     }
   }
