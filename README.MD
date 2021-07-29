@@ -123,8 +123,10 @@ Country Id,Country,Region Id,Region,County Id,County,Health Facility Id,Health F
 ,Kenya,,Nairobi,,Nairob,,Nairobi Hospital
 ```
 
-The ID columns are mandatory as they are used to map locations to their parents. Empty ID column means the location is new, so the system will generate a UUID for it. Exising locations MUST have their IDs pre-populated to avoid duplicating locations.
-Also NOTE the ordering of the columns as per the location hierarchy. It is logical to group all the locations belowing to one level in the same place.
+The ID columns are mandatory as they are used to map locations to their parents. EMPTY ID column means new location, so the system will generate a UUID for the specified location. Existing locations MUST have their IDs pre-populated to avoid duplications. Run the locations with EMPTY ID column once; you can retrieve the generated location ids from this file `/home/<your_username>/opensrp-data/locations.csv` for future use.
+
+Also NOTE that the columns should be ordered according to the location hierarchy. It is logical to group all the locations belonging to one level.
+
 The tool will validate the csv columns and fail if the correct format is not provided. The only thing that is assumed is you have ordered them corectly.
 
 #### Users file CSV file format
