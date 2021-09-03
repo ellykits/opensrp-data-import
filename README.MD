@@ -68,7 +68,7 @@ For example run the following command to list available options (`app.properties
 
 ```shell script
 
-java -jar opensrp-data-import-3.0.1-SNAPSHOT-fat.jar --configs-file app.properties  --help
+java -jar opensrp-data-import-3.0.2-SNAPSHOT-fat.jar --configs-file app.properties  --help
 
 ```
 
