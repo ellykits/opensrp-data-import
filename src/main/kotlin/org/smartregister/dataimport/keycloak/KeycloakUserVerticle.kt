@@ -141,7 +141,7 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
                   ) {
                     this.getJsonArray(CREDENTIALS).getJsonObject(0).apply {
                       remove(TEMPORARY)
-                      put(VALUE, openMRSUsersMap[username])
+                      put(VALUE, openMRSUsersMap.getValue(username).password)
                     }
                   }
                 },
