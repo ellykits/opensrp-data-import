@@ -252,9 +252,9 @@ abstract class BaseVerticle : CoroutineVerticle() {
   }
 
   protected inline fun <reified T> readCsvData(
-    fileName: String, fromAnyPlace: Boolean = false, skipLines: Int = 0
+    fileName: String, fileNameProvided: Boolean = false, skipLines: Int = 0
   ): List<T> {
-    val fullPath = if (fromAnyPlace) fileName else "$dataDirectoryPath$fileName.csv"
+    val fullPath = if (fileNameProvided) fileName else "$dataDirectoryPath$fileName.csv"
 
     val reader = FileReader(fullPath)
     val mappingStrategy = ColumnPositionMappingStrategy<T>().apply { type = T::class.java }

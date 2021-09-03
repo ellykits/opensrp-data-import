@@ -4,14 +4,16 @@ object DatabaseQueries {
 
   const val TEAMS_COUNT_QUERY = "SELECT count(*) from team;"
 
-  const val USERS_ROLE_COUNT_QUERY = """
+  const val USERS_ROLE_COUNT_QUERY =
+      """
   SELECT count(*)
   FROM team_member tm
            INNER JOIN person p on tm.person_id = p.person_id
            INNER JOIN team t on t.team_id = tm.team_id
   """
 
-  const val USERS_COUNT_QUERY = """
+  const val USERS_COUNT_QUERY =
+      """
   SELECT count(*) count
   FROM users u
            INNER JOIN person_name pn ON u.person_id = pn.person_id
@@ -19,13 +21,15 @@ object DatabaseQueries {
   WHERE (u.username != 'openmrs' AND u.username != 'daemon');
   """
 
-  const val TEAM_LOCATIONS_COUNT_QUERY = """
+  const val TEAM_LOCATIONS_COUNT_QUERY =
+      """
   SELECT count(*) count
   FROM team
          INNER JOIN location ON team.location_id = location.location_id;
   """
 
-  const val LOCATIONS_COUNT_QUERY = """
+  const val LOCATIONS_COUNT_QUERY =
+      """
   SELECT count(*) count
   FROM location l
            LEFT JOIN location p on p.location_id = l.parent_location
@@ -33,7 +37,8 @@ object DatabaseQueries {
            LEFT JOIN location_tag t on t.location_tag_id = tm.location_tag_id;
   """
 
-  const val LOCATION_TAGS_COUNT_QUERY = """
+  const val LOCATION_TAGS_COUNT_QUERY =
+      """
      SELECT count(distinct name) count
      FROM location_tag;
   """
@@ -41,17 +46,18 @@ object DatabaseQueries {
     val tagExpression: java.lang.StringBuilder
     if (locationHierarchy.isEmpty() || locationHierarchy.contains("")) {
       tagExpression = StringBuilder("0")
-    }
-    else {
+    } else {
       tagExpression = StringBuilder("CASE\n")
       locationHierarchy.forEach { tag ->
         val tagSplit = tag.split(":")
-        tagExpression.append("WHEN t.name = '${tagSplit.first().trim()}' THEN ${tagSplit.last().trim()}\n")
+        tagExpression.append(
+            "WHEN t.name = '${tagSplit.first().trim()}' THEN ${tagSplit.last().trim()}\n")
       }
       tagExpression.append("END")
     }
 
-    val query = """
+    val query =
+        """
      SELECT json_object(
                  'id', location_id,
                  'type', location_type,
@@ -89,7 +95,7 @@ object DatabaseQueries {
   }
 
   fun getTeamsImportQuery(offset: Int, limit: Int) =
-    """
+      """
     SELECT json_object(
                    'identifier', identifier,
                    'active', 'true',
@@ -109,7 +115,7 @@ object DatabaseQueries {
     """.trimIndent()
 
   fun getTeamLocationsImportQuery(offset: Int, limit: Int) =
-    """
+      """
     SELECT json_object('organization', team.uuid, 'jurisdiction', location.uuid) team_locations
     FROM team
              INNER JOIN location ON team.location_id = location.location_id
@@ -117,28 +123,29 @@ object DatabaseQueries {
     """.trimIndent()
 
   fun getUsersImportQuery(offset: Int, limit: Int) =
-    """
-    SELECT json_object(
-                   'identifier', p.uuid,
-                   'username', u.username,
-                   'firstName', pn.given_name,
-                   'lastName', pn.family_name,
-                   'name', concat(pn.given_name, ' ', pn.family_name),
-                   'enabled', if(retired = 0, 'true', 'false'),
-                   'credentials', json_array(
-                           json_object('type', 'password',
-                                       'value', 'Test1234',
-                                       'temporary', true)
-                       )) practitioners
-    FROM users u
-             INNER JOIN person_name pn ON u.person_id = pn.person_id
-             INNER JOIN person p on pn.person_id = p.person_id
-    WHERE (u.username != 'openmrs' AND u.username != 'daemon')
-    LIMIT $offset,$limit;
+      """
+      SELECT json_object(
+                     'identifier', p.uuid,
+                     'username', u.username,
+                     'firstName', pn.given_name,
+                     'lastName', pn.family_name,
+                     'name', concat(pn.given_name, ' ', pn.family_name),
+                     'enabled', if(pr.retired = 0, 'true', 'false'),
+                     'credentials', json_array(
+                             json_object('type', 'password',
+                                         'value', 'Test1234',
+                                         'temporary', true)
+                         )) practitioners
+      FROM users u
+               INNER JOIN person_name pn ON u.person_id = pn.person_id
+               INNER JOIN person p on pn.person_id = p.person_id
+               INNER JOIN provider pr ON pn.person_id = pr.person_id
+      WHERE (u.username != 'openmrs' AND u.username != 'daemon' AND u.username != '')
+      LIMIT $offset,$limit;
     """.trimIndent()
 
   fun getUserRoleImportQuery(offset: Int, limit: Int) =
-    """
+      """
     SELECT json_object(
                'identifier', tm.uuid,
                'active', if(t.voided = 0, 'true', 'false'),
@@ -152,9 +159,8 @@ object DatabaseQueries {
     LIMIT $offset, $limit;
     """.trimIndent()
 
-
   fun getLocationTagsQuery(offset: Int, limit: Int) =
-    """
+      """
        SELECT json_object(
           'name', name,
           'description', if(description is null, concat(name, ' Tag'), description),
