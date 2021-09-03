@@ -3,7 +3,6 @@ package org.smartregister.dataimport.opensrp.location
 import com.opencsv.CSVReaderBuilder
 import io.vertx.core.Promise
 import io.vertx.core.buffer.Buffer
-import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpResponse
@@ -236,7 +235,11 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           .executeBlocking<Map<String, List<KeycloakUser>>> { promise ->
             try {
               val users =
-                readCsvData<KeycloakUser>(usersFile, true, 1).groupBy { locationKey(it) }
+                readCsvData<KeycloakUser>(
+                  fileName = usersFile,
+                  fileNameProvided = true,
+                  skipLines = 1
+                ).groupBy { locationKey(it) }
               promise.complete(users)
             } catch (exception: IOException) {
               promise.fail(exception)

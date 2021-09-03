@@ -133,7 +133,7 @@ object DatabaseQueries {
     FROM users u
              INNER JOIN person_name pn ON u.person_id = pn.person_id
              INNER JOIN person p on pn.person_id = p.person_id
-    WHERE (u.username != 'openmrs' AND u.username != 'daemon')
+    WHERE (u.username != 'openmrs' AND u.username != 'daemon' AND u.username != '')
     LIMIT $offset,$limit;
     """.trimIndent()
 
