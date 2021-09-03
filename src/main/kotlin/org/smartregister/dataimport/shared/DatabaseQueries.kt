@@ -33,13 +33,24 @@ object DatabaseQueries {
            LEFT JOIN location_tag t on t.location_tag_id = tm.location_tag_id;
   """
 
+  const val LOCATION_TAGS_COUNT_QUERY = """
+     SELECT count(distinct name) count
+     FROM location_tag;
+  """
   fun getLocationsImportQuery(offset: Int, locationHierarchy: List<String>, limit: Int): String {
-    val tagExpression = StringBuilder("CASE\n")
-    locationHierarchy.forEach { tag ->
-      val tagSplit = tag.split(":")
-      tagExpression.append("WHEN t.name = '${tagSplit.first().trim()}' THEN ${tagSplit.last().trim()}\n")
+    val tagExpression: java.lang.StringBuilder
+    if (locationHierarchy.isEmpty() || locationHierarchy.contains("")) {
+      tagExpression = StringBuilder("0")
     }
-    tagExpression.append("END")
+    else {
+      tagExpression = StringBuilder("CASE\n")
+      locationHierarchy.forEach { tag ->
+        val tagSplit = tag.split(":")
+        tagExpression.append("WHEN t.name = '${tagSplit.first().trim()}' THEN ${tagSplit.last().trim()}\n")
+      }
+      tagExpression.append("END")
+    }
+
     val query = """
      SELECT json_object(
                  'id', location_id,
@@ -141,4 +152,17 @@ object DatabaseQueries {
     LIMIT $offset, $limit;
     """.trimIndent()
 
+
+  fun getLocationTagsQuery(offset: Int, limit: Int) =
+    """
+       SELECT json_object(
+          'name', name,
+          'description', if(description is null, concat(name, ' Tag'), description),
+          'active', if(retired = 0, 'true', 'false')
+       ) as locationTags
+      FROM location_tag
+      GROUP BY name
+      ORDER BY location_tag_id ASC
+      LIMIT $offset, $limit;
+    """.trimIndent()
 }

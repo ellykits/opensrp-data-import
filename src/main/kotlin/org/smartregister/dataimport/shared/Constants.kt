@@ -42,6 +42,7 @@ const val OPENMRS_USERS = "openmrs-users"
 const val OPENMRS_TEAMS = "openmrs-teams"
 const val OPENMRS_TEAM_LOCATIONS = "openmrs-team-locations"
 const val OPENMRS_TEAM_ASSIGNMENT = "openmrs-team-assignment"
+const val OPENMRS_LOCATION_TAGS = "openmrs-location-tags"
 
 enum class DataItem {
   LOCATION_TAGS, LOCATIONS, ORGANIZATIONS, ORGANIZATION_LOCATIONS, KEYCLOAK_USERS, KEYCLOAK_USERS_GROUP, PRACTITIONERS, PRACTITIONER_ROLES
