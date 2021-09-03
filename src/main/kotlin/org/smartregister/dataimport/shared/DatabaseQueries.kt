@@ -14,11 +14,12 @@ object DatabaseQueries {
 
   const val USERS_COUNT_QUERY =
       """
-  SELECT count(*) count
-  FROM users u
-           INNER JOIN person_name pn ON u.person_id = pn.person_id
-           INNER JOIN person p on pn.person_id = p.person_id
-  WHERE (u.username != 'openmrs' AND u.username != 'daemon');
+    SELECT count(*) count
+    FROM users u
+             INNER JOIN person_name pn ON u.person_id = pn.person_id
+             INNER JOIN person p on pn.person_id = p.person_id
+             INNER JOIN provider pr ON pn.person_id = pr.person_id
+    WHERE (u.username != 'openmrs' AND u.username != 'daemon' AND u.username != '')
   """
 
   const val TEAM_LOCATIONS_COUNT_QUERY =
