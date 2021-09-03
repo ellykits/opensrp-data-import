@@ -11,7 +11,6 @@ import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.launch
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.smartregister.dataimport.opensrp.BaseOpenSRPVerticle
@@ -26,8 +25,6 @@ import java.util.*
  * data from either openmrs or CSV. Using CSV, gives more flexibility
  */
 class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
-
-  private var locationTagsMap = mapOf<String, LocationTag>()
 
   private var locationIdsMap = TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
 
@@ -56,7 +53,6 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
     try {
       if (sourceFile.isNullOrBlank()) {
-        retrieveLocationTags()
         consumeOpenMRSData(
           dataItem = DataItem.LOCATIONS,
           countAddress = EventBusAddress.OPENMRS_LOCATIONS_COUNT,
@@ -203,13 +199,16 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     locations.forEach { location ->
       // Delete locationTags attributes for locations without tags
       if (location is JsonObject && location.containsKey(LOCATION_TAGS)) {
-        val locationTags = location.getJsonArray(LOCATION_TAGS)
+        val locationTags = location.getJsonArray(LOCATION_TAGS, JsonArray())
         val cleanedTags = JsonArray()
         locationTags.forEach { tag ->
           if (tag is JsonObject) {
             when {
               tag.getString(ID) == null -> location.remove(LOCATION_TAGS)
-              tag.getString(ID) != null -> JsonObject(Json.encodeToString(locationTagsMap[tag.getString(NAME)]))
+              tag.getString(ID) != null -> {
+                val newTag = JsonObject(Json.encodeToString(locationTagsMap[tag.getString(NAME)]))
+                cleanedTags.add(newTag)
+              }
             }
           }
         }
@@ -328,22 +327,6 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       consumeCSVData(csvData = locationsData, DataItem.LOCATIONS) {
         postData(config.getString("opensrp.rest.location.url"), it, DataItem.LOCATIONS)
       }
-    }
-  }
-
-  private suspend fun retrieveLocationTags() {
-    val locationTags =
-      awaitResult<HttpResponse<Buffer>?> {
-        webRequest(
-          method = HttpMethod.GET,
-          url = config.getString("opensrp.rest.location.tag.url"),
-          handler = it
-        )
-      }
-        ?.body()
-    if (locationTags != null && !sourceFile.isNullOrBlank()) {
-      locationTagsMap =
-        Json.decodeFromString<List<LocationTag>>(locationTags.toString()).associateBy { it.name }
     }
   }
 

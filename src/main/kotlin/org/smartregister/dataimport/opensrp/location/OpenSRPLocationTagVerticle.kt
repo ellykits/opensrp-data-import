@@ -1,6 +1,7 @@
 package org.smartregister.dataimport.opensrp.location
 
 import io.vertx.core.buffer.Buffer
+import io.vertx.core.eventbus.Message
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
@@ -8,9 +9,12 @@ import io.vertx.ext.web.client.HttpResponse
 import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitEvent
 import io.vertx.kotlin.coroutines.awaitResult
+import io.vertx.kotlin.coroutines.dispatcher
+import kotlinx.coroutines.launch
 import org.smartregister.dataimport.openmrs.OpenMRSLocationTagVerticle
 import org.smartregister.dataimport.opensrp.BaseOpenSRPVerticle
 import org.smartregister.dataimport.shared.*
+import org.smartregister.dataimport.shared.EventBusAddress.OPENMRS_LOCATION_TAGS_LOAD
 
 /**
  * Subclass of [BaseOpenSRPVerticle] responsible for posting OpenSRP location tags and for deploying [OpenSRPLocationVerticle]
@@ -24,12 +28,26 @@ class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
 
     if (sourceFile.isNullOrBlank()) {
       deployVerticle(OpenMRSLocationTagVerticle(), OPENMRS_LOCATION_TAGS)
-      consumeOpenMRSData(
-        dataItem = DataItem.LOCATION_TAGS,
-        countAddress = EventBusAddress.OPENMRS_LOCATION_TAGS_COUNT,
-        loadAddress = EventBusAddress.OPENMRS_LOCATION_TAGS_LOAD,
-        action = this::postLocationTags
-      )
+      vertx.eventBus().consumer<Int>(EventBusAddress.OPENMRS_LOCATION_TAGS_COUNT).handler { countMessage ->
+        try {
+          var offset = 0
+          val count = countMessage.body()
+          launch(vertx.dispatcher()) {
+            startVertxCounter(DataItem.LOCATION_TAGS, count.toLong(), true)
+            while (offset <= count) {
+              awaitEvent<Long> { vertx.setTimer(getRequestInterval(DataItem.LOCATION_TAGS), it) }
+              val message = awaitResult<Message<JsonArray>> { handler ->
+                vertx.eventBus().request(OPENMRS_LOCATION_TAGS_LOAD, offset, handler)
+              }
+              postLocationTags(message.body())
+              offset += limit
+            }
+          }
+        } catch (throwable: Throwable) {
+          vertx.exceptionHandler().handle(throwable)
+        }
+      }
+
     } else {
       val skipLocationsTags = config.getBoolean(SKIP_LOCATION_TAGS)
 
