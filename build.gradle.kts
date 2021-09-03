@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "org.smartregister"
-version = "2.0.4-SNAPSHOT"
+version = "3.0.0-SNAPSHOT"
 
 repositories {
   mavenCentral()
