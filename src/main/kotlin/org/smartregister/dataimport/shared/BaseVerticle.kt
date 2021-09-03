@@ -163,7 +163,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
           .bearerTokenAuthentication(user!!.getAccessToken())
           .timeout(requestTimeout)
 
-        if (!queryParams.isNullOrEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
+        if (queryParams.isNotEmpty()) queryParams.forEach { httpRequest.addQueryParam(it.key, it.value) }
 
         when (payload) {
           is String -> httpRequest.sendBuffer(Buffer.buffer(payload)) {
