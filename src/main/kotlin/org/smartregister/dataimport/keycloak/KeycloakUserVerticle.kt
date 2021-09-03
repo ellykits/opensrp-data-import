@@ -127,7 +127,6 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
           val existingUser = checkKeycloakUser(payload.getString(USERNAME))
           if (existingUser == null) {
             val username = payload.getString(USERNAME)
-            val credentials = payload.getJsonArray(CREDENTIALS)
 
             awaitResult<HttpResponse<Buffer>?> {
               webRequest(
@@ -137,8 +136,13 @@ class KeycloakUserVerticle : BaseKeycloakVerticle() {
                 payload.apply {
                   remove(IDENTIFIER)
                   remove(NAME)
-                  if (openMRSUsersMap.isNotEmpty() && openMRSUsersMap.containsKey(username) && !credentials.isEmpty) {
-                    credentials.getJsonObject(0).put(VALUE, openMRSUsersMap[username])
+                  if (openMRSUsersMap.isNotEmpty() && openMRSUsersMap.containsKey(username) &&
+                    !this.getJsonArray(CREDENTIALS).isEmpty
+                  ) {
+                    this.getJsonArray(CREDENTIALS).getJsonObject(0).apply {
+                      remove(TEMPORARY)
+                      put(VALUE, openMRSUsersMap[username])
+                    }
                   }
                 },
                 handler = it
