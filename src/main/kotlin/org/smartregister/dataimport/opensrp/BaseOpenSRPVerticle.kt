@@ -98,10 +98,11 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
               awaitResult<Message<JsonArray>> { handler ->
                 eventBus.request(EventBusAddress.OPENMRS_LOCATIONS_LOAD, offset, handler)
               }
-            allLocations.addAll(message.body())
+            val openMRSLocations = message.body()
+            allLocations.addAll(openMRSLocations)
             offset += limit
             counter--
-            logger.info("OPENMRS_LOCATIONS::Retrieved $limit locations")
+            logger.info("OPENMRS_LOCATIONS::Retrieved ${openMRSLocations.size()} locations")
           }
 
           val taggedLocations: List<String> =

@@ -19,7 +19,7 @@ fun main() {
 //    put(SOURCE_FILE, "assets/locations.csv")
 //    put(USERS_FILE, "assets/liberia-users.csv")
 //    put(SKIP_USER_GROUP, true)
-//    put(SKIP_LOCATION_TAGS, true)
+    put(SKIP_LOCATION_TAGS, true)
 //    put(SKIP_LOCATIONS, true)
 //    put(GENERATE_TEAMS, "Health Facility")
   }
