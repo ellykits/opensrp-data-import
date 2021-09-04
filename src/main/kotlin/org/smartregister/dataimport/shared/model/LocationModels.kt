@@ -69,7 +69,7 @@ data class LocationProperties(
   val status: String = "Active",
   var parentId: String = "",
   val name: String,
-  val geographicLevel: Int,
+  val geographicLevel: Int? = 0,
   val version: Int = 0
 )
 

@@ -44,7 +44,7 @@ object DatabaseQueries {
      FROM location_tag;
   """
   fun getLocationsImportQuery(offset: Int, locationHierarchy: List<String>, limit: Int): String {
-    val tagExpression: java.lang.StringBuilder
+    val tagExpression: StringBuilder
     if (locationHierarchy.isEmpty() || locationHierarchy.contains("")) {
       tagExpression = StringBuilder("0")
     } else {
