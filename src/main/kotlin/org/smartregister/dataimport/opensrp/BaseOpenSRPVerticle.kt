@@ -86,16 +86,22 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
       var offset = 0
       val count = countMessage.body()
       val allLocations = JsonArray()
+      val requestInterval = getRequestInterval(dataItem)
+      logger.info("Retrieving $count location(s) from OpenMRS in ${requestInterval/1000} second(s) interval")
+      var counter = ceil(count.toDouble().div(limit.toDouble())).toLong() - 1
       launch(vertx.dispatcher()) {
         try {
           while (offset <= count) {
-            awaitEvent<Long> { vertx.setTimer(getRequestInterval(dataItem), it) }
+            awaitEvent<Long> { vertx.setTimer(requestInterval, it) }
+            logger.info("OPENMRS_LOCATIONS::Request count down -> $counter")
             val message =
               awaitResult<Message<JsonArray>> { handler ->
                 eventBus.request(EventBusAddress.OPENMRS_LOCATIONS_LOAD, offset, handler)
               }
             allLocations.addAll(message.body())
             offset += limit
+            counter--
+            logger.info("OPENMRS_LOCATIONS::Retrieved $limit locations")
           }
 
           val taggedLocations: List<String> =
@@ -111,14 +117,21 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
                     .flatMap { it.getJsonArray(LOCATION_TAGS) }
                     .map { it as JsonObject }
                     .takeLast(entry.value.size - 1)
-                    .forEach {
-                      this.add(it)
+                    .forEach { locationTag ->
+                      if (
+                        !locationTag.getString(NAME).isNullOrEmpty() &&
+                        !locationTag.getString(NAME).isNullOrBlank()
+                      ) {
+                        if (!duplicateTag(locationTags = this, currentLocationTag = locationTag)) {
+                          this.add(locationTag)
+                        }
+                      }
                     }
                 }
                 updateLocationTagIds(this)
               }
             }.map { it.value.first().toString() }
-            .toList()
+              .toList()
           action(taggedLocations)
         } catch (throwable: Throwable) {
           vertx.exceptionHandler().handle(throwable)
@@ -126,6 +139,12 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
       }
     }
   }
+
+  private fun duplicateTag(locationTags: JsonArray, currentLocationTag: JsonObject) = locationTags
+    .map { it as JsonObject }
+    .find { jsonItem ->
+      jsonItem.getString(NAME).equals(currentLocationTag.getString(NAME), ignoreCase = true)
+    } != null
 
   /**
    * Post [data] to the provided [url] keeping track of the number of responses from the server.This
