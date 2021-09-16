@@ -234,7 +234,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
               val allLocations = mutableListOf<Location>()
 
               try {
-                val csvReader = CSVReaderBuilder(FileReader(sourceFile)).build()
+                val csvReader = CSVReaderBuilder(FileReader(sourceFile!!)).build()
                 var cells = csvReader.readNext()
                 val headers = cells
                 var counter = 1
@@ -304,8 +304,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       return false
     }
 
-    // Format: Location level ID column followed by the level e.g. Country Id, Country, Province Id,
-    // Province
+    // Format: Location level ID column followed by the level e.g. Country Id, Country, Province Id, Province
     headers.toList().chunked(2).onEach {
       val (levelId, level) = it
 

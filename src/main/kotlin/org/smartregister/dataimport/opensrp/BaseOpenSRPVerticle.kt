@@ -187,9 +187,9 @@ abstract class BaseOpenSRPVerticle : BaseVerticle() {
           url = config.getString("opensrp.rest.location.tag.url"),
           handler = it
         )
-      }
-        ?.body()
-    if (locationTags != null && config.getString(SOURCE_FILE).isNullOrBlank()) {
+      }?.body()
+
+    if (locationTags != null) {
       locationTagsMap =
         Json.decodeFromString<List<LocationTag>>(locationTags.toString()).associateBy { it.name }
     }
