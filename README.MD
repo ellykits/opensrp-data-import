@@ -168,6 +168,7 @@ This tool will generate CSV files with the content of the data that has been pos
 | keycloak.rest.users.count.url | Endpoint for counting Keycloak Users. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/users/count* |
 | keycloak.rest.groups.url | Endpoint for fetching Keycloak groups. Format *{{keycloak-host}}/auth/admin/realms/{{realm}}/groups* |
 | opensrp.rest.location.url | OpenSRP endpoint for posting locations |
+| opensrp.rest.location.fetch.url | Endpoint for fetching all opensrp locations |
 | opensrp.rest.location.tag.url |OpenSRP endpoint for posting location tags |
 | opensrp.rest.organization.url | OpenSRP endpoint for posting organizations|
 | opensrp.rest.organization.location.url | OpenSRP endpoint for mapping organizations to locations |

@@ -42,7 +42,6 @@ abstract class BaseOpenMRSVerticle : BaseVerticle() {
       vertx.exceptionHandler().handle(sqlException)
     }
 
-
     limit = config.getInteger("data.limit", 50)
   }
 

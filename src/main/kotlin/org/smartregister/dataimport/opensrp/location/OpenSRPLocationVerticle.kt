@@ -2,9 +2,13 @@ package org.smartregister.dataimport.opensrp.location
 
 import com.opencsv.CSVReaderBuilder
 import io.vertx.core.Promise
+import io.vertx.core.buffer.Buffer
+import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonObject
+import io.vertx.ext.web.client.HttpResponse
 import io.vertx.kotlin.coroutines.await
 import io.vertx.kotlin.coroutines.awaitEvent
+import io.vertx.kotlin.coroutines.awaitResult
 import io.vertx.kotlin.coroutines.dispatcher
 import java.io.FileReader
 import java.io.IOException
@@ -41,17 +45,61 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   private var locationOrganizationMap = mapOf<String, OrganizationLocation>()
 
-  var sourceFile: String? = null
+  private var sourceFile: String? = null
+
+  private var organizationFile: String? = null
+
+  private var loadExistingLocations: Boolean = false
+
+  private val existingLocation = mutableListOf<Location>()
 
   override suspend fun start() {
     super.start()
 
     sourceFile = config.getString(SOURCE_FILE)
 
+    loadExistingLocations = config.getBoolean(LOAD_EXISTING_LOCATIONS, false)
+
+    organizationFile = config.getString(ORGANIZATION_LOCATIONS_FILE, "")
+
+
     try {
       if (sourceFile.isNullOrBlank()) {
         consumeOpenMRSLocation(action = this::postLocations)
       } else {
+
+        //--organization-locations-file command option required when running importation for existing locations
+        if (organizationFile.isNullOrBlank() && loadExistingLocations) {
+          logger.error(
+            """
+
+            Error: Missing organization locations CSV file.
+            Description: Organization locations file is required when importing data for existing locations
+            Solution:
+
+            1. Run a query on OpenSRP database to retrieve organization locations in CSV format (organization,jurisdiction)
+            2. Rerun the command with this option "--organization-locations-file <<organization_location.csv>>
+
+          """.trimMargin()
+          )
+          vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
+        }
+
+        //--create-new-teams command option required when running import for existing location
+        if (loadExistingLocations && config.getBoolean(CREATE_NEW_TEAMS) == null) {
+          logger.error(
+            """
+
+            Error: Missing --create-new-teams command option
+            Description: Explicitly specify whether to create new teams when working with existing locations
+            Solution:
+            Rerun the command with this boolean option "--create-new-teams
+
+          """.trimMargin()
+          )
+          vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
+        }
+
         consumeDataFromSources()
         val usersFile = config.getString(USERS_FILE, "")
         if (!usersFile.isNullOrBlank()) {
@@ -60,33 +108,65 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         }
       }
 
-      deployVerticle(
-          OpenSRPLocationTagVerticle(), poolName = DataItem.LOCATION_TAGS.name.lowercase())
+      deployVerticle(OpenSRPLocationTagVerticle(), poolName = DataItem.LOCATION_TAGS.name.lowercase())
     } catch (throwable: Throwable) {
       vertx.exceptionHandler().handle(throwable)
     }
   }
 
   private fun consumeDataFromSources() {
+    //Be notified when locations fetch complete
+    vertx.eventBus().consumer<Boolean>(EventBusAddress.OPENSRP_LOCATION_FETCH_COMPLETE) { message ->
+      val geoLevels: Map<String, Int> =
+        config
+          .getString("location.hierarchy")
+          .split(',')
+          .associateByTo(
+            mutableMapOf(),
+            { key -> key.split(":").first().trim() },
+            { value -> value.split(":").last().trim().toInt() })
+
+      // Generate team and users for locations tagged with hasTeam
+      val generateTeams = config.getString(GENERATE_TEAMS, "")
+
+      if (message.body()) {
+        launch(vertx.dispatcher()) {
+          try {
+            val locationsData = locationsData(geoLevels, generateTeams)
+            val skipLocations = config.getBoolean(SKIP_LOCATIONS, false)
+            if (skipLocations) {
+              completeTask(dataItem = DataItem.LOCATIONS, ignored = true)
+            } else {
+              consumeCSVData(csvData = locationsData, DataItem.LOCATIONS) {
+                postData(config.getString("opensrp.rest.location.url"), it, DataItem.LOCATIONS)
+              }
+            }
+          } catch (exception: Exception) {
+            logger.error(exception)
+          }
+        }
+      }
+    }
+
     try {
       vertx.eventBus().consumer<String>(EventBusAddress.TASK_COMPLETE).handler { message ->
         when (DataItem.valueOf(message.body())) {
           DataItem.LOCATION_TAGS ->
-              launch(vertx.dispatcher()) { extractLocationsFromCSV(sourceFile) }
+            launch(vertx.dispatcher()) { extractLocationsFromCSV() }
           DataItem.LOCATIONS -> {
             val organizationsChunked = organizations.chunked(limit)
             consumeCSVData(organizationsChunked, DataItem.ORGANIZATIONS) {
-              postData(
-                  config.getString("opensrp.rest.organization.url"), it, DataItem.ORGANIZATIONS)
+              postData(config.getString("opensrp.rest.organization.url"), it, DataItem.ORGANIZATIONS)
             }
           }
           DataItem.ORGANIZATIONS -> {
             val organizationLocationsChunked = organizationLocations.chunked(limit)
             consumeCSVData(organizationLocationsChunked, DataItem.ORGANIZATION_LOCATIONS) {
               postData(
-                  config.getString("opensrp.rest.organization.location.url"),
-                  it,
-                  DataItem.ORGANIZATION_LOCATIONS)
+                url = config.getString("opensrp.rest.organization.location.url"),
+                data = it,
+                dataItem = DataItem.ORGANIZATION_LOCATIONS
+              )
             }
           }
           DataItem.ORGANIZATION_LOCATIONS -> {
@@ -95,11 +175,10 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
               completeTask(dataItem = DataItem.KEYCLOAK_USERS, ignored = true)
             } else {
               keycloakUsers =
-                  organizationUsers.map { it.value }.flatten().onEach {
-                    it.practitionerId = UUID.randomUUID().toString()
-                    it.organizationLocation =
-                        locationIdsMap[locationKey(it)] // name separated with '|' sign
-                  }
+                organizationUsers.map { it.value }.flatten().onEach {
+                  it.practitionerId = UUID.randomUUID().toString()
+                  it.organizationLocation = locationIdsMap[locationKey(it)] // name separated with '|' sign
+                }
 
               logger.info("Posting ${keycloakUsers.size} users to Keycloak")
               val keycloakUsersChunked = keycloakUsers.chunked(limit)
@@ -125,17 +204,17 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           DataItem.KEYCLOAK_USERS_GROUP -> {
             practitioners = generatePractitioners()
             consumeCSVData(practitioners.chunked(limit), DataItem.PRACTITIONERS) {
-              postData(
-                  config.getString("opensrp.rest.practitioner.url"), it, DataItem.PRACTITIONERS)
+              postData(config.getString("opensrp.rest.practitioner.url"), it, DataItem.PRACTITIONERS)
             }
           }
           DataItem.PRACTITIONERS -> {
             practitionerRoles = generatePractitionerRoles()
             consumeCSVData(practitionerRoles.chunked(limit), DataItem.PRACTITIONER_ROLES) {
               postData(
-                  config.getString("opensrp.rest.practitioner.role.url"),
-                  it,
-                  DataItem.PRACTITIONER_ROLES)
+                config.getString("opensrp.rest.practitioner.role.url"),
+                it,
+                DataItem.PRACTITIONER_ROLES
+              )
             }
           }
           DataItem.PRACTITIONER_ROLES -> {
@@ -150,35 +229,36 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private fun generatePractitioners() =
-      keycloakUsers
-          .filter {
-            it.practitionerId != null && it.username != null && userIdsMap.containsKey(it.username)
-          }
-          .map {
-            Practitioner(
-                identifier = it.practitionerId!!,
-                name = "${it.firstName} ${it.lastName}",
-                userId = userIdsMap[it.username]!!,
-                username = it.username!!.lowercase())
-          }
-          .onEach { convertToCSV(DataItem.PRACTITIONERS, it) }
+    keycloakUsers
+      .filter {
+        it.practitionerId != null && it.username != null && userIdsMap.containsKey(it.username)
+      }
+      .map {
+        Practitioner(
+          identifier = it.practitionerId!!,
+          name = "${it.firstName} ${it.lastName}",
+          userId = userIdsMap[it.username]!!,
+          username = it.username!!.lowercase()
+        )
+      }
+      .onEach { convertToCSV(DataItem.PRACTITIONERS, it) }
 
   private fun generatePractitionerRoles() =
-      keycloakUsers
-          .filter {
-            it.practitionerId != null &&
-                it.username != null &&
-                userIdsMap.containsKey(it.username) &&
-                it.organizationLocation != null
-          }
-          .map {
-            PractitionerRole(
-                identifier = UUID.randomUUID().toString(),
-                organization =
-                    locationOrganizationMap.getValue(it.organizationLocation!!).organization!!,
-                practitioner = it.practitionerId!!)
-          }
-          .onEach { convertToCSV(DataItem.PRACTITIONER_ROLES, it) }
+    keycloakUsers
+      .filter {
+        it.practitionerId != null &&
+          it.username != null &&
+          userIdsMap.containsKey(it.username) &&
+          it.organizationLocation != null
+      }
+      .map {
+        PractitionerRole(
+          identifier = UUID.randomUUID().toString(),
+          organization = locationOrganizationMap.getValue(it.organizationLocation!!).organization!!,
+          practitioner = it.practitionerId!!
+        )
+      }
+      .onEach { convertToCSV(DataItem.PRACTITIONER_ROLES, it) }
 
   private suspend fun postLocations(locations: List<String>) {
     val locationsList: List<Location> = locations.map { Json.decodeFromString(it) }
@@ -193,108 +273,157 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   private suspend fun extractUsersFromCSV(usersFile: String) {
     if (!config.getString(GENERATE_TEAMS, "").isNullOrBlank()) {
       organizationUsers =
-          vertx
-              .executeBlocking<Map<String, List<KeycloakUser>>> { promise ->
-                try {
-                  val users =
-                      readCsvData<KeycloakUser>(
-                          fileName = usersFile, fileNameProvided = true, skipLines = 1)
-                          .groupBy { locationKey(it) }
-                  promise.complete(users)
-                } catch (exception: IOException) {
-                  promise.fail(exception)
-                  vertx.exceptionHandler().handle(exception)
-                }
-              }
-              .await()
+        vertx
+          .executeBlocking<Map<String, List<KeycloakUser>>> { promise ->
+            try {
+              val users = readCsvData<KeycloakUser>(fileName = usersFile, fileNameProvided = true, skipLines = 1)
+                .groupBy { locationKey(it) }
+              promise.complete(users)
+            } catch (exception: IOException) {
+              promise.fail(exception)
+              vertx.exceptionHandler().handle(exception)
+            }
+          }
+          .await()
     }
   }
 
   private fun locationKey(keycloakUser: KeycloakUser) =
-      "${keycloakUser.parentLocation}|${keycloakUser.location}"
+    "${keycloakUser.parentLocation}|${keycloakUser.location}"
 
-  private suspend fun extractLocationsFromCSV(sourceFile: String?) {
-    val geoLevels: Map<String, Int> =
-        config
-            .getString("location.hierarchy")
-            .split(',')
-            .associateByTo(
-                mutableMapOf(),
-                { key -> key.split(":").first().trim() },
-                { value -> value.split(":").last().trim().toInt() })
-
-    // Generate team and users for locations tagged with hasTeam
-    val generateTeams = config.getString(GENERATE_TEAMS, "")
+  private suspend fun extractLocationsFromCSV() {
 
     retrieveLocationTags()
 
-    val locationsData: List<List<Location>> =
-        vertx
-            .executeBlocking<List<List<Location>>> { promise ->
-              val allLocations = mutableListOf<Location>()
-
-              try {
-                val csvReader = CSVReaderBuilder(FileReader(sourceFile!!)).build()
-                var cells = csvReader.readNext()
-                val headers = cells
-                var counter = 1
-                if (validateHeaders(headers, promise)) {
-                  while (cells != null) {
-                    if (counter > 1) {
-                      val processedLocations = processLocations(headers, cells, geoLevels)
-                      processedLocations.forEach {
-                        val csvLocation =
-                            CSVLocation(
-                                it.parentId,
-                                it.uniqueName,
-                                it.id,
-                                it.exactName,
-                                it.firstLocationTag)
-                        convertToCSV(DataItem.LOCATIONS, csvLocation)
-                      }
-                      allLocations.addAll(processedLocations)
-                    }
-                    cells = csvReader.readNext()
-                    counter++
-                  }
-                }
-              } catch (exception: IOException) {
-                logError(promise, exception.localizedMessage)
-              }
-
-              val newLocations =
-                  allLocations
-                      .onEach {
-                        if (it.assignTeam && !generateTeams.isNullOrBlank()) {
-                          generateOrganizations(it)
-                        }
-                      }
-                      .filter { if (config.getBoolean(OVERWRITE, false)) !it.isNew else it.isNew }
-                      .chunked(limit)
-
-              // Associate location to organization for future mapping with practitioners
-              locationOrganizationMap =
-                  organizationLocations.filterNot { it.jurisdiction == null }.associateBy {
-                    it.jurisdiction!!
-                  }
-
-              promise.complete(newLocations)
-            }
-            .await()
-
-    val skipLocations = config.getBoolean(SKIP_LOCATIONS, false)
-    if (skipLocations) {
-      completeTask(dataItem = DataItem.LOCATIONS, ignored = true)
+    if (loadExistingLocations) {
+      val queryParameters = mutableMapOf(
+        Pair(SERVER_VERSION, "0"),
+        Pair(IS_JURISDICTION, "true"),
+        Pair(LIMIT, limit.toString()),
+      )
+      fetchLocationsRecursively(queryParameters)
     } else {
-      consumeCSVData(csvData = locationsData, DataItem.LOCATIONS) {
-        postData(config.getString("opensrp.rest.location.url"), it, DataItem.LOCATIONS)
-      }
+      vertx.eventBus().send(EventBusAddress.OPENSRP_LOCATION_FETCH_COMPLETE, true)
     }
   }
 
+  private suspend fun locationsData(geoLevels: Map<String, Int>, generateTeams: String?): List<List<Location>> {
+
+    val locationsById = existingLocation.associateBy { it.id }
+
+    if (existingLocation.isNotEmpty()) {
+      val locationsMap = existingLocation.associateBy { location ->
+        val locationName = location.properties?.name
+        val parentId = location.properties?.parentId
+        val parentLocationName = if (parentId.isNullOrEmpty()) "" else locationsById.getValue(parentId).properties?.name
+        """$parentLocationName${if (parentLocationName.isNullOrEmpty()) "" else "|"}$locationName"""
+      }.mapValues { it.value.id!! }
+      locationIdsMap.putAll(locationsMap)
+    }
+
+    val locationsData: List<List<Location>> = vertx.executeBlocking<List<List<Location>>> { promise ->
+      val csvGeneratedLocation = mutableListOf<Location>()
+
+      try {
+        val csvReader = CSVReaderBuilder(FileReader(sourceFile!!)).build()
+        var cells = csvReader.readNext()
+        val headers = cells
+        var counter = 1
+        if (validateHeaders(headers, promise)) {
+          while (cells != null) {
+            if (counter > 1) {
+              val processedLocations = processLocations(headers, cells, geoLevels)
+              processedLocations.forEach {
+                val csvLocation =
+                  CSVLocation(
+                    it.parentId,
+                    it.uniqueName,
+                    it.id,
+                    it.exactName,
+                    it.firstLocationTag
+                  )
+                convertToCSV(DataItem.LOCATIONS, csvLocation)
+              }
+              csvGeneratedLocation.addAll(processedLocations)
+            }
+            cells = csvReader.readNext()
+            counter++
+          }
+        }
+      } catch (exception: IOException) {
+        logError(promise, exception.localizedMessage)
+      }
+
+      if (loadExistingLocations && !organizationFile.isNullOrBlank()) {
+        val organizationLocations =
+          readCsvData<OrganizationLocation>(fileName = organizationFile!!, fileNameProvided = true, skipLines = 1)
+        locationOrganizationMap = organizationLocations.associateBy { it.jurisdiction!! }
+      }
+
+      val createNewTeam = config.getBoolean(CREATE_NEW_TEAMS, true)
+      val newLocations =
+        csvGeneratedLocation
+          .onEach {
+            if (!loadExistingLocations && it.assignTeam && !generateTeams.isNullOrBlank()) {
+              generateOrganizations(it)
+            }
+          }
+          .filter { it.isNew }
+          .chunked(limit)
+
+      if (loadExistingLocations && createNewTeam) {
+        //Create organizations using the users file
+        organizationUsers.forEach {
+          val organizationId = UUID.randomUUID().toString()
+          val organization = Organization(identifier = organizationId, name = "Team ${it.key.split("|").last()}")
+          organizations.add(organization)
+          convertToCSV(DataItem.ORGANIZATIONS, organization)
+          val locationKey = locationKey(it.value.first())
+          if (locationIdsMap.containsKey(locationKey)) {
+            val organizationLocation = OrganizationLocation(organizationId, locationIdsMap.getValue(locationKey))
+            organizationLocations.add(organizationLocation)
+            convertToCSV(DataItem.ORGANIZATION_LOCATIONS, organizationLocation)
+          }
+        }
+      }
+
+      // Associate location to organization for future mapping with practitioners
+      if (!loadExistingLocations) {
+        locationOrganizationMap =
+          organizationLocations.filterNot { it.jurisdiction == null }.associateBy { it.jurisdiction!! }
+      }
+      promise.complete(newLocations)
+
+    }.await()
+    return locationsData
+  }
+
+  private suspend fun fetchLocationsRecursively(queryParameters: MutableMap<String, String>) {
+    logger.info("OPENSRP_LOCATION: Fetched location with serverVersion ${queryParameters[SERVER_VERSION]} and limit - $limit")
+    awaitEvent<Long> { vertx.setTimer(getRequestInterval(DataItem.LOCATIONS), it) }
+    val locationsResponse = awaitResult<HttpResponse<Buffer>?> {
+      webRequest(
+        method = HttpMethod.GET,
+        queryParams = queryParameters,
+        url = config.getString("opensrp.rest.location.fetch.url"),
+        handler = it
+      )
+    }
+    if (locationsResponse == null || locationsResponse.bodyAsJsonArray().isEmpty) {
+      logger.info("OPENSRP_LOCATION: Fetched all ${existingLocation.size} location(s)")
+      vertx.eventBus().send(EventBusAddress.OPENSRP_LOCATION_FETCH_COMPLETE, true)
+      return
+    }
+
+    val locations = jsonEncoder().decodeFromString<List<Location>>(locationsResponse.bodyAsString())
+    existingLocation.addAll(locations)
+    val maxServerVersion: Long = locations.maxOf { it.serverVersion!! }
+    fetchLocationsRecursively(queryParameters.apply { put(SERVER_VERSION, maxServerVersion.plus(1).toString()) })
+  }
+
   private fun validateHeaders(
-      headers: Array<String>,
-      promise: Promise<List<List<Location>>>
+    headers: Array<String>,
+    promise: Promise<List<List<Location>>>
   ): Boolean {
 
     // Columns must be at least 4 and even number
@@ -311,18 +440,20 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       if (!locationTagsMap.containsKey(level)) {
         logger.warn("Location level MUST be below ROOT (e.g Province:1 comes after Country:0)")
         logError(
-            promise,
-            "UNRECOGNIZED_TAG: $level does not exist. Import/use correct location tag to continue.")
+          promise,
+          "UNRECOGNIZED_TAG: $level does not exist. Import/use correct location tag to continue."
+        )
         return false
       }
 
       if (!levelId.endsWith(ID, true) || !levelId.split(" ").containsAll(level.split(" "))) {
         logError(
-            promise,
-            """
+          promise,
+          """
           INVALID_COLUMN_NAME: ($levelId and $level) columns MUST be correctly and named in the order of
           location levels with the ID column preceding e.g.Country Id, Country, Province Id, Province
-        """.trimIndent())
+        """.trimIndent()
+        )
         return false
       }
     }
@@ -330,9 +461,9 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private fun logError(
-      promise: Promise<List<List<Location>>>,
-      message: String,
-      throwable: Throwable? = null
+    promise: Promise<List<List<Location>>>,
+    message: String,
+    throwable: Throwable? = null
   ) {
     promise.fail(message)
     if (throwable != null) {
@@ -343,15 +474,15 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private fun processLocations(
-      headers: Array<String>,
-      values: Array<String>,
-      geoLevels: Map<String, Int>
+    headers: Array<String>,
+    values: Array<String>,
+    geoLevels: Map<String, Int>
   ): List<Location> {
 
     val locations = mutableListOf<Location>()
 
     val chunkedCellRanges =
-        headers.zip(values) { header: String, value: String -> CellRange(header, value) }.chunked(2)
+      headers.zip(values) { header: String, value: String -> CellRange(header, value) }.chunked(2)
 
     val neighbouringCellRanges = chunkedCellRanges.zipWithNext()
 
@@ -359,7 +490,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       val idCellRange = cellRanges.first()
       val nameCellRange = cellRanges.last()
 
-      val isNewLocation = idCellRange.value.isBlank()
+      val isNewLocation = idCellRange.value.isBlank() && !loadExistingLocations
 
       val newLocationId = UUID.randomUUID().toString()
       var parentId = ""
@@ -367,51 +498,55 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
       // Generate ids for new locations. Also track team location ids
       val key =
-          if (index == 0) nameCellRange.value
-          else {
-            with(neighbouringCellRanges) {
-              val currentCellRanges = this[index - 1]
-              val (parentCellRanges, childCellRanges) = currentCellRanges
-              parentId = parentCellRanges.first().value
-              parentKey = getUniqueName(getParentKeyCellRanges(index, neighbouringCellRanges))
-              getUniqueName(parentCellRanges.plus(childCellRanges))
-            }
+        if (index == 0) nameCellRange.value
+        else {
+          with(neighbouringCellRanges) {
+            val currentCellRanges = this[index - 1]
+            val (parentCellRanges, childCellRanges) = currentCellRanges
+            parentId = parentCellRanges.first().value
+            parentKey = getUniqueName(getParentKeyCellRanges(index, neighbouringCellRanges))
+            getUniqueName(parentCellRanges.plus(childCellRanges))
           }
+        }
       // At this point there is a matching location that was already processed. Also skip locations
       // with no names
-      if (locationIdsMap.containsKey(key) || nameCellRange.value.isBlank()) {
+      if (!loadExistingLocations && (locationIdsMap.containsKey(key) || nameCellRange.value.isBlank())) {
         continue
       }
 
-      locationIdsMap[key] = if (isNewLocation) newLocationId else idCellRange.value
+      if (!loadExistingLocations) {
+        locationIdsMap[key] = if (isNewLocation) newLocationId else idCellRange.value
+      }
 
       val locationTag = nameCellRange.header
       val assignTeam = config.getString(GENERATE_TEAMS, "").equals(locationTag, ignoreCase = true)
 
-      // blank Parent Id means we are processing a location from a row of the csv thus refer to the
+      // blank Parent ID means we are processing a location from a row of the csv thus refer to the
       // child location against parent map
       val locationId = locationIdsMap.getValue(key)
       val locationProperties =
-          LocationProperties(
-              name = nameCellRange.value,
-              geographicLevel = geoLevels.getOrDefault(locationTag, 0),
-              parentId =
-                  if (parentId.isBlank()) locationIdsMap.getOrDefault(parentKey, "") else parentId)
+        LocationProperties(
+          name = nameCellRange.value,
+          geographicLevel = geoLevels.getOrDefault(locationTag, 0),
+          parentId =
+          parentId.ifBlank { locationIdsMap.getOrDefault(parentKey, "") }
+        )
 
       val location =
-          Location(
-                  id = locationId,
-                  locationTags = listOf(locationTagsMap.getValue(locationTag)),
-                  properties = locationProperties,
-                  isNew = isNewLocation,
-                  assignTeam = assignTeam,
-                  uniqueName = key,
-                  uniqueParentName = parentKey,
-                  firstLocationTag = locationTag)
-              .apply {
-                this.exactName = locationProperties.name
-                this.parentId = locationProperties.parentId // Flattened for csv
-              }
+        Location(
+          id = locationId,
+          locationTags = listOf(locationTagsMap.getValue(locationTag)),
+          properties = locationProperties,
+          isNew = isNewLocation,
+          assignTeam = assignTeam,
+          uniqueName = key,
+          uniqueParentName = parentKey,
+          firstLocationTag = locationTag
+        )
+          .apply {
+            this.exactName = locationProperties.name
+            this.parentId = locationProperties.parentId // Flattened for csv
+          }
 
       locations.add(location)
     }
@@ -419,8 +554,8 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private fun getParentKeyCellRanges(
-      index: Int,
-      neighbouringCellRanges: List<Pair<List<CellRange>, List<CellRange>>>
+    index: Int,
+    neighbouringCellRanges: List<Pair<List<CellRange>, List<CellRange>>>
   ): MutableList<CellRange> {
 
     var currentIndex = index - 1
@@ -439,22 +574,18 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
   }
 
   private fun getUniqueName(cellRanges: List<CellRange>) =
-      cellRanges
-          .filter { !it.header.endsWith(ID, true) }
-          .joinToString(separator = "|") { it.value }
-          .trim()
+    cellRanges
+      .filter { !it.header.endsWith(ID, true) }
+      .joinToString(separator = "|") { it.value }
+      .trim()
 
   private fun generateOrganizations(location: Location) {
     with(location) {
       try {
-
         val organizationId = UUID.randomUUID().toString()
-
-        val organization =
-            Organization(identifier = organizationId, name = "Team ${properties!!.name}")
+        val organization = Organization(identifier = organizationId, name = "Team ${properties!!.name}")
         organizations.add(organization)
         convertToCSV(DataItem.ORGANIZATIONS, organization)
-
         val organizationLocation = OrganizationLocation(organizationId, id!!)
         organizationLocations.add(organizationLocation)
         convertToCSV(DataItem.ORGANIZATION_LOCATIONS, organizationLocation)
@@ -466,12 +597,10 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
   private inline fun <reified T> convertToCSV(dataItem: DataItem, model: T) {
     vertx
-        .eventBus()
-        .send(
-            EventBusAddress.CSV_GENERATE,
-            JsonObject().apply {
-              put(ACTION, dataItem.name.lowercase())
-              put(PAYLOAD, JsonObject(jsonEncoder().encodeToString(model)))
-            })
+      .eventBus()
+      .send(EventBusAddress.CSV_GENERATE, JsonObject().apply {
+        put(ACTION, dataItem.name.lowercase())
+        put(PAYLOAD, JsonObject(jsonEncoder().encodeToString(model)))
+      })
   }
 }
