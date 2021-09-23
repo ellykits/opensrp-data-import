@@ -85,15 +85,15 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
           vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
         }
 
-        //--create-new-teams command option required when running import for existing location
-        if (loadExistingLocations && config.getBoolean(CREATE_NEW_TEAMS) == null) {
+        //--create-new-teams command option required when running import for existing location. Valid options yes|no
+        if (loadExistingLocations && config.getString(CREATE_NEW_TEAMS) == null) {
           logger.error(
             """
 
             Error: Missing --create-new-teams command option
             Description: Explicitly specify whether to create new teams when working with existing locations
             Solution:
-            Rerun the command with this boolean option "--create-new-teams
+            Rerun the command with this boolean option "--create-new-teams <<yes|no>>
 
           """.trimMargin()
           )
@@ -360,7 +360,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         locationOrganizationMap = organizationLocations.associateBy { it.jurisdiction!! }
       }
 
-      val createNewTeam = config.getBoolean(CREATE_NEW_TEAMS, true)
+      val createNewTeam = config.getString(CREATE_NEW_TEAMS, NO).equals(ignoreCase = true, other= YES)
       val newLocations =
         csvGeneratedLocation
           .onEach {

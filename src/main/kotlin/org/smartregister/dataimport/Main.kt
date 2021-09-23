@@ -29,12 +29,15 @@ class Application : CliktCommand(name = "opensrp-data-import") {
   )
 
   private val loadExistingLocations: Boolean by option(
-    help = "Load existing locations from OpenSRP Server", names = arrayOf("--load-existing-locations", "-lEL")
+    help = "Load existing locations from OpenSRP Server", names = arrayOf("--load-existing-locations", "-lE")
   ).flag(default = false)
 
-  private val createNewTeams: Boolean? by option(
-    help = "Indicate whether to create new teams for existing locations", names = arrayOf("--create-new-teams", "-cT")
-  ).flag(default = true)
+  private val createNewTeams: String? by option(
+    help = "Indicate whether to create new teams for existing locations. Valid options 'yes' or 'no'", names = arrayOf("--create-new-teams", "-cT")
+  ).choice(
+    YES,
+    NO
+  )
 
   private val generateTeams: String? by option(
     help = "Indicate the location level for team assignment", names = arrayOf("--assign-team", "-aT")

@@ -21,7 +21,7 @@ fun main() {
     put(USERS_FILE, "assets/users.csv")
     put(ORGANIZATION_LOCATIONS_FILE, "assets/organization_locations.csv")
     put(SKIP_USER_GROUP, true)
-    put(CREATE_NEW_TEAMS, true)
+    put(CREATE_NEW_TEAMS, "yes")
     put(SKIP_LOCATION_TAGS, true)
     put(SKIP_LOCATIONS, true)
     put(GENERATE_TEAMS, "Health Facility")

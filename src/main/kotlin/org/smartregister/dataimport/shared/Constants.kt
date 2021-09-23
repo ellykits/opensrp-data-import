@@ -50,6 +50,8 @@ const val OPENMRS_LOCATION_TAGS = "openmrs-location-tags"
 const val SERVER_VERSION = "serverVersion"
 const val IS_JURISDICTION = "is_jurisdiction"
 const val LIMIT = "limit"
+const val YES = "yes"
+const val NO = "no"
 
 enum class DataItem {
   LOCATION_TAGS, LOCATIONS, ORGANIZATIONS, ORGANIZATION_LOCATIONS, KEYCLOAK_USERS, KEYCLOAK_USERS_GROUP, PRACTITIONERS, PRACTITIONER_ROLES
