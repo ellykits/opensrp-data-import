@@ -22,17 +22,21 @@ class KeycloakUser {
   @CsvBindByPosition(position = 1)
   var location: String? = null
 
+  @Transient
   @CsvBindByPosition(position = 2)
-  var firstName: String? = null
+  var team: String? = null
 
   @CsvBindByPosition(position = 3)
-  var lastName: String? = null
+  var firstName: String? = null
 
   @CsvBindByPosition(position = 4)
+  var lastName: String? = null
+
+  @CsvBindByPosition(position = 5)
   var username: String? = null
 
   @Transient
-  @CsvBindByPosition(position = 5)
+  @CsvBindByPosition(position = 6)
   var password: String = "Test1234"
     set(value) {
       field = value

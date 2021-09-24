@@ -62,43 +62,15 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
 
     organizationFile = config.getString(ORGANIZATION_LOCATIONS_FILE, "")
 
-
     try {
       if (sourceFile.isNullOrBlank()) {
         consumeOpenMRSLocation(action = this::postLocations)
       } else {
 
-        //--organization-locations-file command option required when running importation for existing locations
-        if (organizationFile.isNullOrBlank() && loadExistingLocations) {
-          logger.error(
-            """
-
-            Error: Missing organization locations CSV file.
-            Description: Organization locations file is required when importing data for existing locations
-            Solution:
-
-            1. Run a query on OpenSRP database to retrieve organization locations in CSV format (organization,jurisdiction)
-            2. Rerun the command with this option "--organization-locations-file <<organization_location.csv>>
-
-          """.trimMargin()
-          )
-          vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
-        }
-
-        //--create-new-teams command option required when running import for existing location. Valid options yes|no
-        if (loadExistingLocations && config.getString(CREATE_NEW_TEAMS) == null) {
-          logger.error(
-            """
-
-            Error: Missing --create-new-teams command option
-            Description: Explicitly specify whether to create new teams when working with existing locations
-            Solution:
-            Rerun the command with this boolean option "--create-new-teams <<yes|no>>
-
-          """.trimMargin()
-          )
-          vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
-        }
+        val createNewTeam = config.getString(CREATE_NEW_TEAMS)
+        validateLoadExistingLocations(createNewTeam)
+        validateCreateUsersInExistingTeams(createNewTeam)
+        validateCreateNewUsersInNewTeams(createNewTeam)
 
         consumeDataFromSources()
         val usersFile = config.getString(USERS_FILE, "")
@@ -111,6 +83,65 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       deployVerticle(OpenSRPLocationTagVerticle(), poolName = DataItem.LOCATION_TAGS.name.lowercase())
     } catch (throwable: Throwable) {
       vertx.exceptionHandler().handle(throwable)
+    }
+  }
+
+  private fun validateLoadExistingLocations(createNewTeam: String?) {
+    //--create-new-teams command option required when running import for existing location. Valid options yes|no
+    if (loadExistingLocations && createNewTeam == null) {
+      logger.error(
+        """
+
+              Error: Missing --create-new-teams command option
+              Description: Explicitly specify whether to create new teams when working with existing locations
+              Solution:
+              Rerun the command with this boolean option "--create-new-teams <<yes|no>>
+
+            """.trimMargin()
+      )
+      vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
+    }
+  }
+
+  private fun validateCreateNewUsersInNewTeams(createNewTeam: String?) {
+    //Do not provide organization locations file when creating new teams to existing locations
+    if (YES.equals(ignoreCase = true, other = createNewTeam) &&
+      loadExistingLocations && !organizationFile.isNullOrBlank()
+    ) {
+      logger.error(
+        """
+
+              Error: Organization locations CSV file is not needed.
+              Description: Organization locations file is not required when creating new users in new teams for existing
+              locations
+              Solution:
+
+              1. Remove offending command option "--organization-locations-file <<organization_location.csv>>
+
+            """.trimMargin()
+      )
+      vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
+    }
+  }
+
+  private fun validateCreateUsersInExistingTeams(createNewTeam: String?) {
+    //organization_locations file is needed when creating new users to existing teams in existing locations
+    if (NO.equals(ignoreCase = true, other = createNewTeam) &&
+      loadExistingLocations && organizationFile.isNullOrBlank()
+    ) {
+      logger.error(
+        """
+
+              Error: Missing organization locations CSV file.
+              Description: Organization locations file is required when importing data for existing locations
+              Solution:
+
+              1. Run a query on OpenSRP database to retrieve organization locations in CSV format (organization,jurisdiction)
+              2. Rerun the command with this option "--organization-locations-file <<organization_location.csv>>
+
+            """.trimMargin()
+      )
+      vertx.eventBus().send(EventBusAddress.APP_SHUTDOWN, true)
     }
   }
 
@@ -364,6 +395,7 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       val newLocations =
         csvGeneratedLocation
           .onEach {
+            //When assigning users to new teams to new locations
             if (!loadExistingLocations && it.assignTeam && !generateTeams.isNullOrBlank()) {
               generateOrganizations(it)
             }
@@ -374,17 +406,22 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
       if (loadExistingLocations && createNewTeam) {
         //Create organizations using the users file
         organizationUsers.forEach {
-          val organizationId = UUID.randomUUID().toString()
-          val organization = Organization(identifier = organizationId, name = "Team ${it.key.split("|").last()}")
-          organizations.add(organization)
-          convertToCSV(DataItem.ORGANIZATIONS, organization)
-          val locationKey = locationKey(it.value.first())
-          if (locationIdsMap.containsKey(locationKey)) {
-            val organizationLocation = OrganizationLocation(organizationId, locationIdsMap.getValue(locationKey))
-            organizationLocations.add(organizationLocation)
-            convertToCSV(DataItem.ORGANIZATION_LOCATIONS, organizationLocation)
+          val hasNoTeam = it.value.any { keycloakUser -> keycloakUser.team.isNullOrBlank() }
+          if (!hasNoTeam) {
+            val organizationId = UUID.randomUUID().toString()
+            val organization = Organization(identifier = organizationId, name = teamName(it.value.first().team!!))
+            organizations.add(organization)
+            convertToCSV(DataItem.ORGANIZATIONS, organization)
+            val locationKey = locationKey(it.value.first())
+            if (locationIdsMap.containsKey(locationKey)) {
+              val organizationLocation = OrganizationLocation(organizationId, locationIdsMap.getValue(locationKey))
+              organizationLocations.add(organizationLocation)
+              convertToCSV(DataItem.ORGANIZATION_LOCATIONS, organizationLocation)
+            }
           }
         }
+        locationOrganizationMap =
+          organizationLocations.filterNot { it.jurisdiction == null }.associateBy { it.jurisdiction!! }
       }
 
       // Associate location to organization for future mapping with practitioners
@@ -583,7 +620,8 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
     with(location) {
       try {
         val organizationId = UUID.randomUUID().toString()
-        val organization = Organization(identifier = organizationId, name = "Team ${properties!!.name}")
+        val team = organizationUsers[location.uniqueName]?.first()?.team ?: properties!!.name
+        val organization = Organization(identifier = organizationId, name = teamName(team))
         organizations.add(organization)
         convertToCSV(DataItem.ORGANIZATIONS, organization)
         val organizationLocation = OrganizationLocation(organizationId, id!!)
@@ -593,6 +631,11 @@ class OpenSRPLocationVerticle : BaseOpenSRPVerticle() {
         vertx.exceptionHandler().handle(throwable)
       }
     }
+  }
+
+  private fun teamName(team: String): String {
+    val teamNamePrefix = config.getString("team.name.prefix", "")
+    return if (teamNamePrefix.isNullOrBlank()) team else "$teamNamePrefix $team"
   }
 
   private inline fun <reified T> convertToCSV(dataItem: DataItem, model: T) {
