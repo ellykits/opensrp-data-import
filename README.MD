@@ -180,7 +180,7 @@ This tool will generate CSV files with the content of the data that has been pos
 | request.interval | Set time interval in milliseconds between each request. Default `10000` |
 | request.timeout | Sets the timeout in milliseconds. If an action is not completed before this timeout, the action is considered as a failure default `-1` (no timeout)|
 | reset.timeout |  Sets the time in ms before it attempts to re-close the circuit (by going to the half-open state). If the circuit is closed when the timeout is reached, nothing happens. `-1` disables this feature. Default `10000` |
-
+| team.name.prefix | Prefix for the name of team e.g. if the prefix is 'Team', the organizations will be created as Team Jenga, Team Ona |
 
 ### Building Project
 
