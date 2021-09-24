@@ -30,9 +30,9 @@ This tool can read data from 2 sources:
 
 1. Download the latest version of the `*-fat.jar` from [Releases](https://github.com/ellykits/opensrp-data-import/releases). Alternatively you can build the project by running the command `./gradlew shadowJar` then locate the uber jar inside `build/lib` directory.
 
-2. Copy the content of the file `application_sample.properties` into your configs file. Replace the placeholders  with the correct values. It is okay to retain the defaults like `request.limit` config but you can alter the figures like required. (Optimal number of batch record that can be processed by OpenSRP in one request is 60 - this is of course dependent on the server specs)
+2. Copy the content of the file `application_sample.properties` into your configs file. Replace the placeholders  with the correct values. It is okay to retain the defaults like `request.limit` config, but you can alter the figures like required. (Optimal number of batch record that can be processed by OpenSRP in one request is 60 - this is of course dependent on the server specs)
 
-3. Execute the commands as desired. When importing data from OpenMRS it is adviced to follow the order defined in the documentation.
+3. Execute the commands as desired. When importing data from OpenMRS it is advised to follow the order defined in the documentation.
 
 > NOTE: Some actions are dependent on others for instance you cannot import teams from OpenMRS without adding the locations first.
 
@@ -68,7 +68,7 @@ For example run the following command to list available options (`app.properties
 
 ```shell script
 
-java -jar opensrp-data-import-3.0.5-SNAPSHOT-fat.jar --configs-file app.properties  --help
+java -jar opensrp-data-import-3.1.0-SNAPSHOT-fat.jar --configs-file app.properties  --help
 
 ```
 
@@ -126,21 +126,21 @@ Country Id,Country,Region Id,Region,County Id,County,Health Facility Id,Health F
 ,Kenya,,Nairobi,,Nairob,,Nairobi Hospital
 ```
 
-The ID columns are mandatory as they are used to map locations to their parents. EMPTY ID column means new location, so the system will generate a UUID for the specified location. Existing locations MUST have their IDs pre-populated to avoid duplications. Run the locations with EMPTY ID column once; you can retrieve the generated location ids from this file `/home/<your_username>/opensrp-data/locations.csv` for future use.
+The ID columns are mandatory as they are used to mapping locations to their parents. EMPTY ID column means new location, so the system will generate a UUID for the specified location. Existing locations MUST have their IDs pre-populated to avoid duplications. Run the locations with EMPTY ID column once; you can retrieve the generated location ids from this file `/home/<your_username>/opensrp-data/locations.csv` for future use.
 
 Also NOTE that the columns should be ordered according to the location hierarchy. It is logical to group all the locations belonging to one level.
 
-The tool will validate the csv columns and fail if the correct format is not provided. The only thing that is assumed is you have ordered them corectly.
+The tool will validate the csv columns and fail if the correct format is not provided. The only thing that is assumed is you have ordered them correctly.
 
 #### Users file CSV file format
-The CSV tempalte for importing users to Keycloak and adding as practitioners in OpenSRP is as follows:
+The CSV template for importing users to Keycloak and adding as practitioners in OpenSRP is as follows:
 
 ```csv
 Parent Location,Location,First Name,Last Name,Username,Password
 ```
 
 The names of the column headers is not important as the CSV reader uses the position of the column to read the file, the content however MUST be in that order.
-The **Parent Location** is necessary because you can have locations sharing a name at different level. Also not that the names MUST be exactly what was provided in the source file.
+The **Parent Location** is necessary because you can have locations sharing a name at different level. Also, not that the names MUST be exactly what was provided in the source file.
 
 
 #### Accessing Generated CSV files

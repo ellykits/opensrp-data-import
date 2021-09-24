@@ -33,7 +33,8 @@ class Application : CliktCommand(name = "opensrp-data-import") {
   ).flag(default = false)
 
   private val createNewTeams: String? by option(
-    help = "Indicate whether to create new teams for existing locations. Valid options 'yes' or 'no'", names = arrayOf("--create-new-teams", "-cT")
+    help = "Indicate whether to create new teams for existing locations. Valid options 'yes' or 'no'",
+    names = arrayOf("--create-new-teams", "-cT")
   ).choice(
     YES,
     NO
