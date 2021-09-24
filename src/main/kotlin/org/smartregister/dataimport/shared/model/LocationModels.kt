@@ -62,6 +62,8 @@ class Location() {
   @Transient
   var uniqueParentName: String? = null
 
+  var serverVersion: Long? = null
+
 }
 
 @Serializable

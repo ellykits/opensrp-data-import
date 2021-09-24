@@ -28,17 +28,30 @@ class Application : CliktCommand(name = "opensrp-data-import") {
     names = arrayOf("--source-file", "-s")
   )
 
-  private val overwrite: Boolean by option(
-    help = "Overwrite existing locations", names = arrayOf("--overwrite", "-oW")
+  private val loadExistingLocations: Boolean by option(
+    help = "Load existing locations from OpenSRP Server", names = arrayOf("--load-existing-locations", "-lE")
   ).flag(default = false)
+
+  private val createNewTeams: String? by option(
+    help = "Indicate whether to create new teams for existing locations. Valid options 'yes' or 'no'",
+    names = arrayOf("--create-new-teams", "-cT")
+  ).choice(
+    YES,
+    NO
+  )
 
   private val generateTeams: String? by option(
     help = "Indicate the location level for team assignment", names = arrayOf("--assign-team", "-aT")
   )
 
   private val usersFile: String? by option(
-    help = "File containing users details. This is used to export to ",
+    help = "CSV file containing user details. CSV Header(Parent Location, Location, First Name, Last Name, Username, Password) ",
     names = arrayOf("--users-file", "-u")
+  )
+
+  private val organizationLocationsFile: String? by option(
+    help = "CSV file containing organization locations. CSV Header (Organization, Jurisdiction)",
+    names = arrayOf("--organization-locations-file", "-oL")
   )
 
   private val skipLocationTags: Boolean by option(
@@ -87,21 +100,30 @@ class Application : CliktCommand(name = "opensrp-data-import") {
 
     if (configsFile != null && importOption != null) {
       mainVerticle.setConfigsFile(configsFile!!)
-
       val configs = JsonObject().apply {
         put(IMPORT_OPTION, importOption)
         put(SOURCE_FILE, sourceFile)
         put(USERS_FILE, usersFile)
+        put(ORGANIZATION_LOCATIONS_FILE, organizationLocationsFile)
         put(SKIP_LOCATION_TAGS, skipLocationTags)
         put(SKIP_LOCATIONS, skipLocations)
         put(SKIP_USER_GROUP, skipUserGroup)
         put(GENERATE_TEAMS, generateTeams)
-        put(OVERWRITE, overwrite)
+        put(LOAD_EXISTING_LOCATIONS, loadExistingLocations)
+        put(CREATE_NEW_TEAMS, createNewTeams)
       }
-
       vertx.deployVerticle(mainVerticle, deploymentOptionsOf(config = configs))
     } else {
-      echo("--configs-file and --import options are required --source-file optional. Use --help for more information")
+      echo(
+        """
+          Error: Missing required command option
+          Description:
+          --configs-file: Provide configurations file (Required *)
+          --import: Indicate the resource to import e.g. locations (Required *)
+          Solution:
+          Run --help for more information
+        """.trimMargin()
+      )
     }
   }
 }

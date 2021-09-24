@@ -63,7 +63,10 @@ abstract class BaseVerticle : CoroutineVerticle() {
 
   protected val concreteClassName: String = this::class.java.simpleName
 
-  protected fun jsonEncoder() = Json { encodeDefaults = true }
+  protected fun jsonEncoder() = Json {
+    encodeDefaults = true
+    ignoreUnknownKeys = true
+  }
 
   private var requestTimeout: Long = -1
 
@@ -218,16 +221,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
     logger.info("Stopping verticle:  $concreteClassName")
   }
 
-  protected fun commonConfigs() =
-    JsonObject().apply {
-      put(IMPORT_OPTION, config.getString(IMPORT_OPTION))
-      put(SOURCE_FILE, config.getString(SOURCE_FILE, ""))
-      put(USERS_FILE, config.getString(USERS_FILE, ""))
-      put(SKIP_LOCATION_TAGS, config.getBoolean(SKIP_LOCATION_TAGS, false))
-      put(SKIP_LOCATIONS, config.getBoolean(SKIP_LOCATIONS, false))
-      put(SKIP_USER_GROUP, config.getBoolean(SKIP_USER_GROUP, false))
-      put(GENERATE_TEAMS, config.getString(GENERATE_TEAMS, ""))
-    }
+  open fun commonConfigs(): JsonObject = JsonObject().mergeIn(config)
 
   protected inline fun <reified T> writeCsv(fileName: String, payload: String) {
     val fileWriter = FileWriter("$dataDirectoryPath$fileName.csv", true)
@@ -264,6 +258,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       val csvToBean = CsvToBeanBuilder<T>(reader)
         .withType(T::class.java)
         .withIgnoreLeadingWhiteSpace(true)
+        .withIgnoreEmptyLine(true)
         .withSkipLines(skipLines)
         .withMappingStrategy(mappingStrategy)
         .build()
@@ -369,7 +364,7 @@ abstract class BaseVerticle : CoroutineVerticle() {
       else -> config.getLong("request.interval", 30000)
     }
 
-  protected fun taskName(dataItem: DataItem) = dataItem.name.lowercase()
+  private fun taskName(dataItem: DataItem) = dataItem.name.lowercase()
 
   fun shutDown(dataItem: DataItem, message: String? = null) {
     val sourceFile = this.taskName(dataItem)

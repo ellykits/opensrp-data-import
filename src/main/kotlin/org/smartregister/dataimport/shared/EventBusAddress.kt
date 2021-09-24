@@ -5,6 +5,7 @@ package org.smartregister.dataimport.shared
  */
 object EventBusAddress {
   const val APP_SHUTDOWN = "app.shutdown"
+  const val OPENSRP_LOCATION_FETCH_COMPLETE = "opensrp.location.fetch.complete"
   const val USER_FOUND = "user.found"
   const val TASK_COMPLETE = "task.complete"
   const val CSV_GENERATE = "csv.generate"

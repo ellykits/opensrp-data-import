@@ -24,7 +24,7 @@ class OpenSRPLocationTagVerticle : BaseOpenSRPVerticle() {
   override suspend fun start() {
     super.start()
     val sourceFile = config.getString(SOURCE_FILE)
-    val skipLocationsTags = config.getBoolean(SKIP_LOCATION_TAGS)
+    val skipLocationsTags = config.getBoolean(SKIP_LOCATION_TAGS, false)
     if (!skipLocationsTags) {
       if (sourceFile.isNullOrBlank()) {
         deployVerticle(OpenMRSLocationTagVerticle(), OPENMRS_LOCATION_TAGS)

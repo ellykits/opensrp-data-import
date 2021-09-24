@@ -27,7 +27,6 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
 
     if (config.getString(SOURCE_FILE, "").isNullOrBlank()) {
       val baseUrl = config.getString("keycloak.rest.users.url")
-      val queryParameters = mutableMapOf(FIRST to "0", MAX to limit.toString())
       val countResponse = awaitResult<HttpResponse<Buffer>?> {
         webRequest(
           method = HttpMethod.GET,
@@ -36,6 +35,7 @@ class OpenSRPPractitionerVerticle : BaseOpenSRPVerticle() {
         )
       }
 
+      val queryParameters = mutableMapOf(FIRST to "0", MAX to limit.toString())
       if (countResponse != null) {
         val userCount = countResponse.bodyAsString().toLong()
         var offset = 0

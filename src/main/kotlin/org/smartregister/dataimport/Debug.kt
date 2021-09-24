@@ -16,12 +16,15 @@ import org.smartregister.dataimport.shared.*
 fun main() {
   val configs = JsonObject().apply {
     put(IMPORT_OPTION, "locations")
-//    put(SOURCE_FILE, "assets/locations.csv")
-//    put(USERS_FILE, "assets/liberia-users.csv")
-//    put(SKIP_USER_GROUP, true)
+    put(SOURCE_FILE, "assets/locations.csv")
+    put(USERS_FILE, "assets/users.csv")
+    put(LOAD_EXISTING_LOCATIONS, true)
+//    put(ORGANIZATION_LOCATIONS_FILE, "assets/organization_locations.csv")
+    put(CREATE_NEW_TEAMS, "yes")
+    put(SKIP_USER_GROUP, true)
     put(SKIP_LOCATION_TAGS, true)
-//    put(SKIP_LOCATIONS, true)
-//    put(GENERATE_TEAMS, "Health Facility")
+    put(SKIP_LOCATIONS, true)
+    put(GENERATE_TEAMS, "Health Facility")
   }
   Vertx.vertx().deployVerticle(MainVerticle(), deploymentOptionsOf(config = configs))
 }
