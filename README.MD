@@ -98,7 +98,13 @@ You can find sample google sheet that you can download as CSV here [Locations an
 
 --users-file or -u (required) : Name of file with user data
 
+--load-existing-locations or -lE (optional) : Load existing locations from OpenSRP Server
+
+--create-new-teams or -cT (required when using -lE option) : Indicate whether to create new teams for existing locations. Valid options 'yes' or 'no'
+
 --assign-team (optional) : Indicate the location level for team assignment e.g "Health Facility"
+
+--organization-locations-file or -oL (required when -cT 'No' and -lE options are specified) : Name of file with organizations and their jurisdictions
 
 --skip-location-tags or -sT (optional) : Skip importing location tags (just import locations)
 
