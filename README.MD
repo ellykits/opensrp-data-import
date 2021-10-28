@@ -148,6 +148,26 @@ Parent Location,Location,First Name,Last Name,Username,Password
 The names of the column headers is not important as the CSV reader uses the position of the column to read the file, the content however MUST be in that order.
 The **Parent Location** is necessary because you can have locations sharing a name at different level. Also, not that the names MUST be exactly what was provided in the source file.
 
+#### Generating the organization locations CSV
+The organization location file should contain organizations and their associated locations/jurisdictions in this format:
+
+```csv
+organization,jurisdiction
+```
+
+To get the values execute the following query:
+
+```sql
+select og.identifier organization, lm.geojson_id jurisdiction from team.organization og inner join team.organization_location ol on og.id = ol.organization_id
+inner join core.location_metadata lm on lm.location_id = ol.location_id
+```
+
+To export the results of the query to a csv file with `psql`, specify the query and CSV file name as in the example below:
+```bash
+psql -h db_host -U db_user -c "select og.identifier organization, lm.geojson_id jurisdiction from team.organization og inner join team.organization_location ol on og.id = ol.organization_id
+inner join core.location_metadata lm on lm.location_id = ol.location_id" --csv > organizations_jurisdictions.csv
+```
+
 
 #### Accessing Generated CSV files
 
