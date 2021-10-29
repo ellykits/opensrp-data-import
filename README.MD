@@ -98,7 +98,13 @@ You can find sample google sheet that you can download as CSV here [Locations an
 
 --users-file or -u (required) : Name of file with user data
 
+--load-existing-locations or -lE (optional) : Load existing locations from OpenSRP Server
+
+--create-new-teams or -cT (required when using -lE option) : Indicate whether to create new teams for existing locations. Valid options 'yes' or 'no'
+
 --assign-team (optional) : Indicate the location level for team assignment e.g "Health Facility"
+
+--organization-locations-file or -oL (required when -cT 'No' and -lE options are specified) : Name of file with organizations and their jurisdictions
 
 --skip-location-tags or -sT (optional) : Skip importing location tags (just import locations)
 
@@ -114,7 +120,7 @@ You can find sample google sheet that you can download as CSV here [Locations an
 
 ```shell script
 
-java -jar opensrp-data-import-2.0.4-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
+java -jar opensrp-data-import-3.1.0-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
 
 ```
 
@@ -136,11 +142,31 @@ The tool will validate the csv columns and fail if the correct format is not pro
 The CSV template for importing users to Keycloak and adding as practitioners in OpenSRP is as follows:
 
 ```csv
-Parent Location,Location,First Name,Last Name,Username,Password
+Parent Location,Location,Team,First Name,Last Name,Username,Password
 ```
 
 The names of the column headers is not important as the CSV reader uses the position of the column to read the file, the content however MUST be in that order.
 The **Parent Location** is necessary because you can have locations sharing a name at different level. Also, not that the names MUST be exactly what was provided in the source file.
+
+#### Generating the organization locations CSV
+The organization location file should contain organizations and their associated locations/jurisdictions in this format:
+
+```csv
+organization,jurisdiction
+```
+
+To get the values execute the following query:
+
+```sql
+select og.identifier organization, lm.geojson_id jurisdiction from team.organization og inner join team.organization_location ol on og.id = ol.organization_id
+inner join core.location_metadata lm on lm.location_id = ol.location_id
+```
+
+To export the results of the query to a csv file with `psql`, specify the query and CSV file name as in the example below:
+```bash
+psql -h db_host -U db_user -c "select og.identifier organization, lm.geojson_id jurisdiction from team.organization og inner join team.organization_location ol on og.id = ol.organization_id
+inner join core.location_metadata lm on lm.location_id = ol.location_id" --csv > organizations_jurisdictions.csv
+```
 
 
 #### Accessing Generated CSV files
