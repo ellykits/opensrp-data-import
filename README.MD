@@ -120,7 +120,7 @@ You can find sample google sheet that you can download as CSV here [Locations an
 
 ```shell script
 
-java -jar opensrp-data-import-2.0.4-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
+java -jar opensrp-data-import-3.1.0-SNAPSHOT-fat.jar --configs-file app.properties  --users-file users.csv --source-file locations.csv --assign-team "Health Facility" --import locations
 
 ```
 
