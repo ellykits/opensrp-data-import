@@ -142,7 +142,7 @@ The tool will validate the csv columns and fail if the correct format is not pro
 The CSV template for importing users to Keycloak and adding as practitioners in OpenSRP is as follows:
 
 ```csv
-Parent Location,Location,First Name,Last Name,Username,Password
+Parent Location,Location,Team,First Name,Last Name,Username,Password
 ```
 
 The names of the column headers is not important as the CSV reader uses the position of the column to read the file, the content however MUST be in that order.
